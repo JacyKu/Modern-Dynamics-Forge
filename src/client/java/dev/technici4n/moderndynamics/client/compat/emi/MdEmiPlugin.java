@@ -18,9 +18,10 @@
  */
 package dev.technici4n.moderndynamics.client.compat.emi;
 
+import dev.emi.emi.api.EmiEntrypoint;
 import dev.emi.emi.api.EmiPlugin;
 import dev.emi.emi.api.EmiRegistry;
-import dev.emi.emi.api.FabricEmiStack;
+import dev.emi.emi.api.forge.ForgeEmiStack;
 import dev.emi.emi.api.stack.EmiStack;
 import dev.emi.emi.api.stack.EmiStackInteraction;
 import dev.emi.emi.api.widget.Bounds;
@@ -30,6 +31,7 @@ import dev.technici4n.moderndynamics.gui.menu.FluidConfigSlot;
 import dev.technici4n.moderndynamics.init.MdItems;
 import java.util.List;
 
+@EmiEntrypoint
 public class MdEmiPlugin implements EmiPlugin {
     @Override
     public void register(EmiRegistry registry) {
@@ -55,7 +57,7 @@ public class MdEmiPlugin implements EmiPlugin {
                 if (ioScreen.getHoveredSlot() instanceof FluidConfigSlot fluidConfig) {
                     var variant = fluidConfig.getFilter();
                     if (!variant.isBlank()) {
-                        return new EmiStackInteraction(FabricEmiStack.of(variant), null, false);
+                        return new EmiStackInteraction(ForgeEmiStack.of(variant.toStack(1)), null, false);
                     }
                 }
             }

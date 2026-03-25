@@ -31,6 +31,8 @@ public class PipeBoundingBoxes {
     public static final VoxelShape[] PIPE_CONNECTIONS = buildSideShapes(CORE_SIZE, CORE_START);
     public static final VoxelShape[] CONNECTOR_SHAPES = buildSideShapes(8.0 / 16, 4.0 / 16);
     public static final VoxelShape[] INVENTORY_CONNECTIONS = combinePiecewise(PIPE_CONNECTIONS, CONNECTOR_SHAPES);
+    private static final ConcurrentHashMap<Integer, VoxelShape> pipeShapeCache = new ConcurrentHashMap<>();
+    public static final VoxelShape MAX_PIPE_SHAPE = getPipeShape((1 << 6) - 1, (1 << 6) - 1, 0);
 
     public static VoxelShape[] buildSideShapes(double connectorSide, double connectorDepth) {
         double connectorSideStart = (1 - connectorSide) / 2;
@@ -73,8 +75,6 @@ public class PipeBoundingBoxes {
         return combinedShapes;
     }
 
-    private static final ConcurrentHashMap<Integer, VoxelShape> pipeShapeCache = new ConcurrentHashMap<>();
-
     public static VoxelShape getPipeShape(int pipeConnections, int inventoryConnections, int attachments) {
         // Attachments force inventory connections
         inventoryConnections |= attachments;
@@ -100,6 +100,7 @@ public class PipeBoundingBoxes {
             }
         }
 
+        shape = shape.optimize();
         pipeShapeCache.put(cacheKey, shape);
         return shape;
     }

@@ -22,7 +22,7 @@ import dev.technici4n.moderndynamics.Constants;
 import dev.technici4n.moderndynamics.attachment.IoAttachmentItem;
 import dev.technici4n.moderndynamics.init.MdMenus;
 import dev.technici4n.moderndynamics.pipe.PipeBlockEntity;
-import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
+import dev.technici4n.moderndynamics.util.FluidVariant;
 import net.minecraft.core.Direction;
 import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;

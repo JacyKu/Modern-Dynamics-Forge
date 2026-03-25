@@ -24,50 +24,50 @@ import static dev.technici4n.moderndynamics.pipe.PipeBoundingBoxes.CORE_START;
 import dev.technici4n.moderndynamics.attachment.attached.AttachedAttachment;
 import dev.technici4n.moderndynamics.client.GeometryHelper;
 import dev.technici4n.moderndynamics.model.PipeModelData;
+import dev.technici4n.moderndynamics.thirdparty.fabric.MeshBuilderImpl;
+import dev.technici4n.moderndynamics.thirdparty.fabric.ModelHelper;
+import dev.technici4n.moderndynamics.thirdparty.fabric.MutableQuadView;
+import dev.technici4n.moderndynamics.thirdparty.fabric.QuadEmitter;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
-import net.fabricmc.fabric.api.renderer.v1.RendererAccess;
-import net.fabricmc.fabric.api.renderer.v1.mesh.Mesh;
-import net.fabricmc.fabric.api.renderer.v1.mesh.MutableQuadView;
-import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
-import net.fabricmc.fabric.api.renderer.v1.model.FabricBakedModel;
-import net.fabricmc.fabric.api.renderer.v1.model.ModelHelper;
-import net.fabricmc.fabric.api.renderer.v1.render.RenderContext;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.block.model.ItemOverrides;
 import net.minecraft.client.renderer.block.model.ItemTransforms;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.BakedModel;
-import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraftforge.client.ChunkRenderTypeSet;
+import net.minecraftforge.client.model.data.ModelData;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public class PipeBakedModel implements BakedModel, FabricBakedModel {
+public class PipeBakedModel implements BakedModel {
+    private static final ChunkRenderTypeSet CUTOUT_RENDER_TYPES = ChunkRenderTypeSet.of(RenderType.cutout());
     private final TextureAtlasSprite baseSprite;
-    private final Mesh[] baseMeshes;
+    private final List<BakedQuad>[][] baseQuads;
     private final BakedModel[] connectorModels;
     private final BakedModel[] straightLineModels;
-    private final AttachmentsBakedModel attachments;
+    private final Map<String, BakedModel[]> attachments;
     private final boolean transparent;
 
     public PipeBakedModel(TextureAtlasSprite baseSprite, BakedModel[] connectorModels, BakedModel[] straightLineModels,
-            AttachmentsBakedModel attachments, boolean transparent) {
+            Map<String, BakedModel[]> attachments, boolean transparent) {
         this.baseSprite = baseSprite;
         this.connectorModels = connectorModels;
         this.straightLineModels = straightLineModels;
         this.attachments = attachments;
 
         this.transparent = transparent;
-        this.baseMeshes = new Mesh[1 << 6];
+        this.baseQuads = new List[1 << 6][];
 
-        var meshBuilder = RendererAccess.INSTANCE.getRenderer().meshBuilder();
+        var meshBuilder = new MeshBuilderImpl();
 
-        for (int connections = 0; connections < baseMeshes.length; ++connections) {
+        for (int connections = 0; connections < baseQuads.length; ++connections) {
             var qe = meshBuilder.getEmitter();
 
             for (int i = 0; i < 6; ++i) {
@@ -93,13 +93,13 @@ public class PipeBakedModel implements BakedModel, FabricBakedModel {
                 }
             }
 
-            baseMeshes[connections] = meshBuilder.build();
+            baseQuads[connections] = ModelHelper.toQuadLists(meshBuilder.build());
         }
     }
 
     @Override
     public List<BakedQuad> getQuads(@Nullable BlockState state, @Nullable Direction side, RandomSource rand) {
-        return List.of();
+        return getQuads(state, side, rand, ITEM_MODEL_DATA, null);
     }
 
     @Override
@@ -137,13 +137,9 @@ public class PipeBakedModel implements BakedModel, FabricBakedModel {
         return ModelHelper.MODEL_TRANSFORM_BLOCK;
     }
 
-    @Override
-    public boolean isVanillaAdapter() {
-        return false;
-    }
-
     // Pipes in item form only connect to NORTH and SOUTH.
     private static final PipeModelData ITEM_DATA = new PipeModelData((byte) 12, (byte) 12, new AttachedAttachment[6]);
+    private static final ModelData ITEM_MODEL_DATA = ModelData.builder().with(PipeModelData.PIPE_DATA, ITEM_DATA).build();
 
     private void appendBitmasked(Consumer<BakedModel> consumer, int mask, BakedModel[] models) {
         for (int i = 0; i < 6; ++i) {
@@ -153,16 +149,75 @@ public class PipeBakedModel implements BakedModel, FabricBakedModel {
         }
     }
 
-    @Override
-    public void emitBlockQuads(BlockAndTintGetter blockView, BlockState state, BlockPos pos, Supplier<RandomSource> randomSupplier,
-            RenderContext context) {
-        var pipeData = blockView.getBlockEntityRenderData(pos) instanceof PipeModelData pipeModelData ? pipeModelData : PipeModelData.DEFAULT;
-        drawPipe(pipeData, context);
+    private static List<BakedQuad> getFaceQuads(List<BakedQuad>[] bakedQuads, @Nullable Direction side) {
+        return bakedQuads[ModelHelper.toFaceIndex(side)];
     }
 
     @Override
-    public void emitItemQuads(ItemStack stack, Supplier<RandomSource> randomSupplier, RenderContext context) {
-        drawPipe(ITEM_DATA, context);
+    public @NotNull List<BakedQuad> getQuads(@Nullable BlockState state, @Nullable Direction side, @NotNull RandomSource rand,
+            @NotNull ModelData data, @Nullable RenderType renderType) {
+        var pipeData = data.get(PipeModelData.PIPE_DATA);
+        if (pipeData == null) {
+            pipeData = PipeModelData.DEFAULT;
+        }
+
+        int connectionsPipe = pipeData.pipeConnections();
+        int connectionsInventory = pipeData.inventoryConnections();
+        int connections = connectionsInventory | connectionsPipe;
+        boolean hasAttachments = false;
+
+        for (int i = 0; i < 6; ++i) {
+            var attachment = pipeData.attachments()[i];
+            if (attachment != null) {
+                hasAttachments = true;
+                connections |= 1 << i;
+            }
+        }
+
+        if (connections == 3 || connections == 12 || connections == 48) {
+            BakedModel straightModel;
+            if (connections == 3) {
+                straightModel = straightLineModels[0];
+            } else if (connections == 12) {
+                straightModel = straightLineModels[2];
+            } else {
+                straightModel = straightLineModels[4];
+            }
+            if (connectionsInventory == 0 && !hasAttachments) {
+                return straightModel.getQuads(state, side, rand, data, renderType);
+            }
+
+            var result = new ArrayList<BakedQuad>(straightModel.getQuads(state, side, rand, data, renderType));
+            Consumer<BakedModel> fallbackConsumer = bakedModel -> result.addAll(bakedModel.getQuads(state, side, rand, data, renderType));
+            appendBitmasked(fallbackConsumer, connectionsInventory, connectorModels);
+
+            for (int i = 0; i < 6; ++i) {
+                var attachment = pipeData.attachments()[i];
+                if (attachment != null) {
+                    fallbackConsumer.accept(attachments.get(attachment.modelId())[i]);
+                }
+            }
+
+            return result;
+        }
+
+        var baseShell = getFaceQuads(baseQuads[connections], side);
+        if (connectionsInventory == 0 && !hasAttachments) {
+            return baseShell;
+        }
+
+        var result = new ArrayList<BakedQuad>(baseShell);
+        Consumer<BakedModel> fallbackConsumer = bakedModel -> result.addAll(bakedModel.getQuads(state, side, rand, data, renderType));
+        appendBitmasked(fallbackConsumer, connectionsInventory, connectorModels);
+
+        for (int i = 0; i < 6; ++i) {
+            var attachment = pipeData.attachments()[i];
+            if (attachment != null) {
+                fallbackConsumer.accept(attachments.get(attachment.modelId())[i]);
+            }
+        }
+
+        return result;
     }
 
     private void baseQuad(QuadEmitter qe, Direction side, float left, float bottom, float right, float top, float depth) {
@@ -183,42 +238,8 @@ public class PipeBakedModel implements BakedModel, FabricBakedModel {
         }
     }
 
-    private void drawPipe(PipeModelData data, RenderContext context) {
-        int connectionsPipe = data.pipeConnections();
-        int connectionsInventory = data.inventoryConnections();
-        int connections = connectionsInventory | connectionsPipe;
-
-        // Also render connections to attachments
-        for (int i = 0; i < 6; ++i) {
-            var attachment = data.attachments()[i];
-            if (attachment != null) {
-                connections |= 1 << i;
-            }
-        }
-
-        // Render base connections
-        if (connections == 3 || connections == 12 || connections == 48) {
-            // Straight line!
-            if (connections == 3) {
-                context.fallbackConsumer().accept(straightLineModels[0]);
-            } else if (connections == 12) {
-                context.fallbackConsumer().accept(straightLineModels[2]);
-            } else {
-                context.fallbackConsumer().accept(straightLineModels[4]);
-            }
-        } else {
-            baseMeshes[connections].outputTo(context.getEmitter());
-        }
-
-        // Render connectors
-        appendBitmasked(context.fallbackConsumer(), connectionsInventory, connectorModels);
-
-        // Render attachments
-        for (int i = 0; i < 6; ++i) {
-            var attachment = data.attachments()[i];
-            if (attachment != null) {
-                context.fallbackConsumer().accept(attachments.attachmentModels.get(attachment.modelId())[i]);
-            }
-        }
+    @Override
+    public ChunkRenderTypeSet getRenderTypes(@NotNull BlockState state, @NotNull RandomSource rand, @NotNull ModelData data) {
+        return CUTOUT_RENDER_TYPES;
     }
 }

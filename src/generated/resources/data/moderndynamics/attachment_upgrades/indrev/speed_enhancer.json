@@ -1,15 +1,13 @@
-{
-  "fabric:load_conditions": [
-    {
-      "condition": "fabric:all_mods_loaded",
-      "values": [
-        "indrev"
-      ]
-    }
-  ],
-  "addItemSpeed": 1,
-  "addItemTransferFrequency": 1,
-  "item": "indrev:speed_enhancer",
-  "multiplyFluidTransfer": 1,
-  "slotLimit": 3
+﻿{
+    "addItemSpeed":  1,
+    "addItemTransferFrequency":  1,
+    "item":  "indrev:speed_enhancer",
+    "multiplyFluidTransfer":  1,
+    "slotLimit":  3,
+    "forge:conditions":  [
+                             {
+                                 "type":  "forge:mod_loaded",
+                                 "modid":  "indrev"
+                             }
+                         ]
 }

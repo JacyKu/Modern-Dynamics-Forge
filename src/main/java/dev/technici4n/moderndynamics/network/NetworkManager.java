@@ -187,19 +187,30 @@ public class NetworkManager<H extends NodeHost, C extends NetworkCache<H, C>> {
         pendingUpdates.clear();
     }
 
-    private void assignNetworkDfs(NetworkNode<H, C> u, Network<H, C> network) {
-        if (pendingUpdates.add(u)) {
+    private void assignNetworkDfs(NetworkNode<H, C> startNode, Network<H, C> network) {
+        Deque<NetworkNode<H, C>> nodesToVisit = new ArrayDeque<>();
+        nodesToVisit.push(startNode);
+
+        while (!nodesToVisit.isEmpty()) {
+            NetworkNode<H, C> node = nodesToVisit.pop();
+            if (!pendingUpdates.add(node)) {
+                continue;
+            }
+
             // Remove previous network
-            if (u.network != null)
-                networks.remove(u.network);
+            if (node.network != null) {
+                networks.remove(node.network);
+            }
 
             // Link node to new network
-            u.network = network;
-            network.nodes.add(u);
+            node.network = network;
+            network.nodes.add(node);
 
             // Visit neighbors
-            for (NetworkNode.Connection<H, C> connection : u.getConnections()) {
-                assignNetworkDfs(connection.target(), network);
+            for (NetworkNode.Connection<H, C> connection : node.getConnections()) {
+                if (!pendingUpdates.contains(connection.target())) {
+                    nodesToVisit.push(connection.target());
+                }
             }
         }
     }

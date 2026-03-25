@@ -34,12 +34,6 @@ public class MdItems {
     public static final PipeItem ITEM_PIPE = new PipeItem(MdBlocks.ITEM_PIPE);
     public static final PipeItem FLUID_PIPE = new PipeItem(MdBlocks.FLUID_PIPE);
 
-    public static final PipeItem LV_CABLE = new PipeItem(MdBlocks.LV_CABLE);
-    public static final PipeItem MV_CABLE = new PipeItem(MdBlocks.MV_CABLE);
-    public static final PipeItem HV_CABLE = new PipeItem(MdBlocks.HV_CABLE);
-    public static final PipeItem EV_CABLE = new PipeItem(MdBlocks.EV_CABLE);
-    public static final PipeItem SUPERCONDUCTOR_CABLE = new PipeItem(MdBlocks.SUPERCONDUCTOR_CABLE);
-
     /*
      * public static final PipeItem BASIC_ITEM_PIPE_OPAQUE = new PipeItem(MdBlocks.BASIC_ITEM_PIPE_OPAQUE);
      * public static final PipeItem FAST_ITEM_PIPE = new PipeItem(MdBlocks.FAST_ITEM_PIPE);
@@ -77,11 +71,6 @@ public class MdItems {
     public static final PipeItem[] ALL_PIPES = new PipeItem[] {
             ITEM_PIPE,
             FLUID_PIPE,
-            LV_CABLE,
-            MV_CABLE,
-            HV_CABLE,
-            EV_CABLE,
-            SUPERCONDUCTOR_CABLE,
             /*
              * BASIC_ITEM_PIPE_OPAQUE,
              * FAST_ITEM_PIPE,

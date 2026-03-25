@@ -1,0 +1,13 @@
+{
+  "forge:conditions": [
+    {
+      "type": "forge:mod_loaded",
+      "modid": "immersiveengineering"
+    }
+  ],
+  "addItemSpeed": 1,
+  "addItemTransferFrequency": 1,
+  "item": "immersiveengineering:conveyor_extract",
+  "slotLimit": 3
+}
+

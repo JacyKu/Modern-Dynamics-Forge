@@ -25,16 +25,17 @@ import dev.technici4n.moderndynamics.client.screen.FluidAttachedIoScreen;
 import dev.technici4n.moderndynamics.client.screen.ItemAttachedIoScreen;
 import dev.technici4n.moderndynamics.gui.menu.FluidConfigSlot;
 import dev.technici4n.moderndynamics.gui.menu.ItemConfigSlot;
+import dev.technici4n.moderndynamics.util.FluidVariant;
+import dev.technici4n.moderndynamics.util.ItemVariant;
 import java.util.ArrayList;
 import java.util.List;
-import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
-import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.material.Fluid;
+import net.minecraftforge.fluids.FluidStack;
 
 class DragDropHandler implements EmiDragDropHandler<Screen> {
     private static Rect2i getSlotBounds(Slot slot, AttachedIoScreen<?> screen) {
@@ -48,7 +49,7 @@ class DragDropHandler implements EmiDragDropHandler<Screen> {
         if (gui instanceof ItemAttachedIoScreen ioScreen && ing.getKey() instanceof Item i) {
             for (var s : ioScreen.getMenu().slots) {
                 if (s instanceof ItemConfigSlot slot && slot.isActive() && getSlotBounds(s, ioScreen).contains(mouseX, mouseY)) {
-                    var iv = ItemVariant.of(i, ing.getNbt());
+                    var iv = ItemVariant.of(ing.getItemStack());
                     ioScreen.getMenu().setFilter(slot.getConfigIdx(), iv, true);
                     return true;
                 }
@@ -58,7 +59,11 @@ class DragDropHandler implements EmiDragDropHandler<Screen> {
         if (gui instanceof FluidAttachedIoScreen ioScreen && ing.getKey() instanceof Fluid f) {
             for (var s : ioScreen.getMenu().slots) {
                 if (s instanceof FluidConfigSlot slot && slot.isActive() && getSlotBounds(s, ioScreen).contains(mouseX, mouseY)) {
-                    var fv = FluidVariant.of(f, ing.getNbt());
+                    var fluidStack = new FluidStack(f, 1);
+                    if (ing.getNbt() != null) {
+                        fluidStack.setTag(ing.getNbt().copy());
+                    }
+                    var fv = FluidVariant.of(fluidStack);
                     ioScreen.getMenu().setFilter(slot.getConfigIdx(), fv, true);
                     return true;
                 }

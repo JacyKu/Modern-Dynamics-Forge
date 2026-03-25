@@ -1,3 +1,7 @@
+# context files
+
+history/
+
 # gradle
 
 .gradle/

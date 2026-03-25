@@ -1,0 +1,13 @@
+{
+  "forge:conditions": [
+    {
+      "type": "forge:mod_loaded",
+      "modid": "refinedstorage"
+    }
+  ],
+  "addFluidTransfer": 2,
+  "addItemCount": 16,
+  "item": "refinedstorage:stack_upgrade",
+  "slotLimit": 4
+}
+

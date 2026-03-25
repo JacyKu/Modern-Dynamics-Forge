@@ -26,7 +26,7 @@ import dev.technici4n.moderndynamics.test.framework.MdGameTest;
 import dev.technici4n.moderndynamics.test.framework.MdGameTestHelper;
 import net.fabricmc.fabric.api.gametest.v1.FabricGameTest;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidConstants;
-import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
+import dev.technici4n.moderndynamics.util.FluidVariant;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;

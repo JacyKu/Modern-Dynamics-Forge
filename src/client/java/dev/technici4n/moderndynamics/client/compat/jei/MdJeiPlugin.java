@@ -30,14 +30,12 @@ import java.util.function.Function;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
 import mezz.jei.api.gui.handlers.IGuiContainerHandler;
-import mezz.jei.api.helpers.IPlatformFluidHelper;
 import mezz.jei.api.ingredients.ITypedIngredient;
 import mezz.jei.api.registration.IGuiHandlerRegistration;
 import mezz.jei.api.registration.IRecipeCatalystRegistration;
 import mezz.jei.api.registration.IRecipeCategoryRegistration;
 import mezz.jei.api.registration.IRecipeRegistration;
 import mezz.jei.api.runtime.IClickableIngredient;
-import mezz.jei.api.runtime.IJeiRuntime;
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.inventory.Slot;
@@ -45,16 +43,9 @@ import net.minecraft.world.item.ItemStack;
 
 @JeiPlugin
 public class MdJeiPlugin implements IModPlugin {
-    private IPlatformFluidHelper<?> platformFluidHelper;
-
     @Override
     public ResourceLocation getPluginUid() {
         return MdId.of("jei");
-    }
-
-    @Override
-    public void onRuntimeAvailable(IJeiRuntime jeiRuntime) {
-        this.platformFluidHelper = jeiRuntime.getJeiHelpers().getPlatformFluidHelper();
     }
 
     @Override
@@ -95,7 +86,7 @@ public class MdJeiPlugin implements IModPlugin {
                     var variant = fluidConfig.getFilter();
                     if (!variant.isBlank()) {
                         var ing = registration.getJeiHelpers().getIngredientManager();
-                        return ing.createTypedIngredient(platformFluidHelper.create(variant.getFluid(), 1, variant.getNbt()))
+                        return ing.createTypedIngredient(variant.toStack(1))
                                 .map(slotArea(screen, fluidConfig));
                     }
                 }

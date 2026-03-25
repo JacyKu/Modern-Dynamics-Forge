@@ -1,0 +1,14 @@
+{
+  "forge:conditions": [
+    {
+      "type": "forge:mod_loaded",
+      "modid": "mekanism"
+    }
+  ],
+  "addItemSpeed": 1,
+  "addItemTransferFrequency": 1,
+  "item": "mekanism:upgrade_speed",
+  "multiplyFluidTransfer": 1,
+  "slotLimit": 3
+}
+

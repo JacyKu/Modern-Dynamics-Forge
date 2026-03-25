@@ -19,16 +19,12 @@
 package dev.technici4n.moderndynamics.client.attachment;
 
 import dev.technici4n.moderndynamics.attachment.upgrade.LoadedUpgrades;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import dev.technici4n.moderndynamics.util.UnsidedPacketHandler;
 
 public class SetAttachmentUpgradesPacket {
-    public static final ClientPlayNetworking.PlayChannelHandler HANDLER = (client, handler, buf, responseSender) -> {
+    public static final UnsidedPacketHandler HANDLER = (player, buf) -> {
         var loadedUpgrades = LoadedUpgrades.fromPacket(buf);
 
-        if (!handler.getConnection().isMemoryConnection()) {
-            client.execute(() -> {
-                LoadedUpgrades.trySet(loadedUpgrades);
-            });
-        }
+        return () -> LoadedUpgrades.trySet(loadedUpgrades);
     };
 }

@@ -27,9 +27,9 @@ import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import dev.technici4n.moderndynamics.gui.menu.FluidAttachedIoMenu;
 import dev.technici4n.moderndynamics.gui.menu.FluidConfigSlot;
+import dev.technici4n.moderndynamics.util.FluidRenderUtil;
+import dev.technici4n.moderndynamics.util.FluidVariant;
 import java.util.Optional;
-import net.fabricmc.fabric.api.transfer.v1.client.fluid.FluidVariantRendering;
-import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -52,7 +52,7 @@ public class FluidAttachedIoScreen extends AttachedIoScreen<FluidAttachedIoMenu>
         if (getMenu().getCarried().isEmpty() && this.hoveredSlot instanceof FluidConfigSlot fluidSlot) {
             var variant = fluidSlot.getFilter();
             if (!variant.isBlank()) {
-                guiGraphics.renderTooltip(font, FluidVariantRendering.getTooltip(variant), Optional.empty(), mouseX, mouseY);
+                guiGraphics.renderTooltip(font, variant.getTooltip(), Optional.empty(), mouseX, mouseY);
             }
         } else {
             renderTooltip(guiGraphics, mouseX, mouseY);
@@ -66,8 +66,8 @@ public class FluidAttachedIoScreen extends AttachedIoScreen<FluidAttachedIoMenu>
 
     public static void drawFluidInGui(PoseStack ms, FluidVariant fluid, float i, float j, int scale, float fractionUp) {
         RenderSystem.setShaderTexture(0, InventoryMenu.BLOCK_ATLAS);
-        TextureAtlasSprite sprite = FluidVariantRendering.getSprite(fluid);
-        int color = FluidVariantRendering.getColor(fluid);
+        TextureAtlasSprite sprite = FluidRenderUtil.getStillSprite(fluid);
+        int color = FluidRenderUtil.getTint(fluid);
 
         if (sprite == null)
             return;

@@ -1,0 +1,12 @@
+{
+  "forge:conditions": [
+    {
+      "type": "forge:mod_loaded",
+      "modid": "refinedstorage"
+    }
+  ],
+  "addFilterSlots": 2,
+  "item": "refinedstorage:upgrade",
+  "slotLimit": 6
+}
+

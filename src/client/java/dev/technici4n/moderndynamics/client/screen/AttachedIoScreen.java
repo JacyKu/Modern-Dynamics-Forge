@@ -140,22 +140,6 @@ public class AttachedIoScreen<T extends AttachedIoMenu<?>> extends AbstractConta
         }
     }
 
-    @Override
-    protected void renderSlot(GuiGraphics guiGraphics, Slot slot) {
-        // Skip disabled slots
-        if (slot instanceof ConfigSlot<?>configSlot && !configSlot.isActive()) {
-            return;
-        }
-        if (slot instanceof FluidConfigSlot fluidConfigSlot) {
-            var variant = fluidConfigSlot.getFilter();
-            if (!variant.isBlank()) {
-                FluidAttachedIoScreen.drawFluidInGui(guiGraphics.pose(), fluidConfigSlot.getFilter(), slot.x, slot.y);
-            }
-        } else {
-            super.renderSlot(guiGraphics, slot);
-        }
-    }
-
     protected void addToggleButtons(List<CycleSettingButton<?>> toggleButtons) {
         if (menu.isSettingSupported(Setting.FILTER_INVERSION)) {
             toggleButtons.add(new CycleSettingButton<>(CycleSettingButton.FILTER_INVERSION, menu.getFilterMode(), menu::setFilterMode));

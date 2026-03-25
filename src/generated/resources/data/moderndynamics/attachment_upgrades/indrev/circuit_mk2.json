@@ -1,15 +1,13 @@
-{
-  "fabric:load_conditions": [
-    {
-      "condition": "fabric:all_mods_loaded",
-      "values": [
-        "indrev"
-      ]
-    }
-  ],
-  "addFilterSlots": 2,
-  "addFluidTransfer": 1,
-  "addItemCount": 20,
-  "item": "indrev:circuit_mk2",
-  "slotLimit": 6
+﻿{
+    "addFilterSlots":  2,
+    "addFluidTransfer":  1,
+    "addItemCount":  20,
+    "item":  "indrev:circuit_mk2",
+    "slotLimit":  6,
+    "forge:conditions":  [
+                             {
+                                 "type":  "forge:mod_loaded",
+                                 "modid":  "indrev"
+                             }
+                         ]
 }

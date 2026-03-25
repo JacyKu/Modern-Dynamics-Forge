@@ -20,6 +20,7 @@ package dev.technici4n.moderndynamics.pipe;
 
 import com.google.common.base.Preconditions;
 import dev.technici4n.moderndynamics.MdBlock;
+import dev.technici4n.moderndynamics.network.TickHelper;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -41,6 +42,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.chunk.ChunkStatus;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.level.material.MapColor;
@@ -107,6 +110,8 @@ public class PipeBlock extends MdBlock implements EntityBlock, SimpleWaterlogged
             level.scheduleTick(currentPos, Fluids.WATER, Fluids.WATER.getTickDelay(level));
         }
 
+        scheduleNeighborRefresh(level, currentPos);
+
         return super.updateShape(state, direction, neighborState, level, currentPos, neighborPos);
     }
 
@@ -130,9 +135,7 @@ public class PipeBlock extends MdBlock implements EntityBlock, SimpleWaterlogged
     @SuppressWarnings("deprecation")
     @Override
     public void neighborChanged(BlockState state, Level world, BlockPos pos, Block param4, BlockPos param5, boolean param6) {
-        if (world.getBlockEntity(pos) instanceof PipeBlockEntity pipe) {
-            pipe.scheduleHostUpdates();
-        }
+        scheduleNeighborRefresh(world, pos);
     }
 
     @Override
@@ -140,14 +143,48 @@ public class PipeBlock extends MdBlock implements EntityBlock, SimpleWaterlogged
         return true;
     }
 
+    private static void scheduleNeighborRefresh(LevelAccessor level, BlockPos pos) {
+        if (!(level instanceof Level world) || world.isClientSide()) {
+            return;
+        }
+
+        TickHelper.runLater(() -> {
+            if (world.getBlockEntity(pos) instanceof PipeBlockEntity pipe
+                    && !pipe.isRemoved()
+                    && pipe.getLevel() == world
+                    && pipe.getBlockPos().equals(pos)) {
+                pipe.invalidateHostCaches();
+                pipe.scheduleHostUpdates();
+            }
+        });
+    }
+
+    @Nullable
+    private static PipeBlockEntity findPipeBlockEntity(Level level, BlockPos pos) {
+        var chunk = level.getChunk(pos.getX() >> 4, pos.getZ() >> 4, ChunkStatus.FULL, false);
+        if (chunk instanceof LevelChunk levelChunk) {
+            var blockEntity = levelChunk.getBlockEntity(pos, LevelChunk.EntityCreationType.CHECK);
+            if (blockEntity instanceof PipeBlockEntity pipe) {
+                return pipe;
+            }
+        }
+
+        return null;
+    }
+
     @SuppressWarnings("deprecation")
     @Override
     public VoxelShape getShape(BlockState state, BlockGetter world, BlockPos pos, CollisionContext ctx) {
-        if (world.getBlockEntity(pos) instanceof PipeBlockEntity pipe) {
-            return pipe.getCachedShape();
-        } else {
+        if (world instanceof Level level) {
+            var pipe = findPipeBlockEntity(level, pos);
+            if (pipe != null) {
+                return pipe.getCachedShape();
+            }
+
             return PipeBoundingBoxes.CORE_SHAPE;
         }
+
+        return PipeBoundingBoxes.MAX_PIPE_SHAPE;
     }
 
     @SuppressWarnings("deprecation")

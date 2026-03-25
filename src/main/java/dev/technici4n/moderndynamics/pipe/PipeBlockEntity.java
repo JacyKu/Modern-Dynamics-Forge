@@ -29,7 +29,6 @@ import dev.technici4n.moderndynamics.network.TickHelper;
 import dev.technici4n.moderndynamics.util.DropHelper;
 import dev.technici4n.moderndynamics.util.ShapeHelper;
 import dev.technici4n.moderndynamics.util.WrenchHelper;
-import net.fabricmc.fabric.api.lookup.v1.block.BlockApiLookup;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.NonNullList;
@@ -48,6 +47,10 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraftforge.client.model.data.ModelData;
+import net.minecraftforge.common.capabilities.Capability;
+import net.minecraftforge.common.util.LazyOptional;
+import net.minecraftforge.network.NetworkHooks;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -64,7 +67,7 @@ public abstract class PipeBlockEntity extends MdBlockEntity {
     public int connectionBlacklist = 0;
     private VoxelShape cachedShape = PipeBoundingBoxes.CORE_SHAPE;
     /* client side stuff */
-    private PipeModelData clientModelData = null;
+    private ModelData clientModelData = ModelData.EMPTY;
 
     private int clientSideConnections = 0;
 
@@ -79,10 +82,16 @@ public abstract class PipeBlockEntity extends MdBlockEntity {
 
     private boolean hasAttachment(Direction side) {
         if (isClientSide()) {
-            return clientModelData != null && clientModelData.attachments()[side.get3DDataValue()] != null;
+            var pipeData = getPipeModelData();
+            return pipeData != null && pipeData.attachments()[side.get3DDataValue()] != null;
         } else {
             return getAttachment(side) != null;
         }
+    }
+
+    @Nullable
+    private PipeModelData getPipeModelData() {
+        return clientModelData.get(PipeModelData.PIPE_DATA);
     }
 
     public final AttachedAttachment getAttachment(Direction side) {
@@ -137,7 +146,7 @@ public abstract class PipeBlockEntity extends MdBlockEntity {
 
         // remesh flag, a bit hacky but it should work ;)
         // the second check ensures that the very first packet is processed even though it doesn't have the remesh flag
-        if (tag.getBoolean("#c") || clientModelData == null) {
+        if (tag.getBoolean("#c") || clientModelData == ModelData.EMPTY) {
             var attachmentTags = tag.getList("attachments", Tag.TAG_COMPOUND);
             var attachments = new AttachmentModelData[6];
             for (var direction : Direction.values()) {
@@ -145,16 +154,23 @@ public abstract class PipeBlockEntity extends MdBlockEntity {
                 attachments[direction.get3DDataValue()] = AttachmentModelData.from(attachmentTag);
             }
 
-            clientModelData = new PipeModelData(connections, inventoryConnections, attachments);
+            clientModelData = ModelData.builder()
+                    .with(PipeModelData.PIPE_DATA, new PipeModelData(connections, inventoryConnections, attachments))
+                    .build();
             clientSideConnections = connections | inventoryConnections;
+            requestModelDataUpdate();
 
             updateCachedShape(connections, inventoryConnections);
         }
     }
 
-    @Override
     @Nullable
     public Object getRenderData() {
+        return getPipeModelData();
+    }
+
+    @Override
+    public ModelData getModelData() {
         return clientModelData;
     }
 
@@ -189,6 +205,12 @@ public abstract class PipeBlockEntity extends MdBlockEntity {
     public void scheduleHostUpdates() {
         for (NodeHost host : getHosts()) {
             host.scheduleUpdate();
+        }
+    }
+
+    public void invalidateHostCaches() {
+        for (NodeHost host : getHosts()) {
+            host.invalidateCaches();
         }
     }
 
@@ -235,14 +257,24 @@ public abstract class PipeBlockEntity extends MdBlockEntity {
     }
 
     @Nullable
-    public Object getApiInstance(BlockApiLookup<?, Direction> direction, @Nullable Direction side) {
+    public Object getApiInstance(Capability<?> capability, @Nullable Direction side) {
         for (var host : getHosts()) {
-            var api = host.getApiInstance(direction, side);
+            var api = host.getApiInstance(capability, side);
             if (api != null) {
                 return api;
             }
         }
         return null;
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T> LazyOptional<T> getCapability(Capability<T> capability, @Nullable Direction side) {
+        var api = getApiInstance(capability, side);
+        if (api != null) {
+            return LazyOptional.of(() -> (T) api);
+        }
+        return super.getCapability(capability, side);
     }
 
     protected int getPipeConnections() {
@@ -420,7 +452,13 @@ public abstract class PipeBlockEntity extends MdBlockEntity {
                 var attachment = getAttachment(hitSide);
                 if (attachment != null && attachment.hasMenu()) {
                     // Open attachment GUI
-                    player.openMenu(attachment.createMenu(this, hitSide));
+                    var provider = attachment.createMenu(this, hitSide);
+                    if (player instanceof net.minecraft.server.level.ServerPlayer serverPlayer
+                            && provider instanceof dev.technici4n.moderndynamics.util.ExtendedMenuProvider extendedProvider) {
+                        NetworkHooks.openScreen(serverPlayer, extendedProvider, extendedProvider::writeScreenOpeningData);
+                    } else {
+                        player.openMenu(provider);
+                    }
                 }
             }
             return InteractionResult.sidedSuccess(isClientSide());
@@ -446,7 +484,17 @@ public abstract class PipeBlockEntity extends MdBlockEntity {
     public ItemStack overridePickBlock(HitResult hitResult) {
         Vec3 posInBlock = hitResult.getLocation().subtract(worldPosition.getX(), worldPosition.getY(), worldPosition.getZ());
         Direction side = hitTestAttachments(posInBlock);
-        return side != null ? new ItemStack(clientModelData.attachments()[side.get3DDataValue()].item()) : ItemStack.EMPTY;
+        if (side == null) {
+            return ItemStack.EMPTY;
+        }
+
+        var pipeData = getPipeModelData();
+        if (pipeData == null) {
+            return ItemStack.EMPTY;
+        }
+
+        var attachment = pipeData.attachments()[side.get3DDataValue()];
+        return attachment == null ? ItemStack.EMPTY : new ItemStack(attachment.item());
     }
 
     public void onRemoved() {

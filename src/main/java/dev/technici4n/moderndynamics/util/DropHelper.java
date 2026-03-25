@@ -18,9 +18,9 @@
  */
 package dev.technici4n.moderndynamics.util;
 
+import dev.technici4n.moderndynamics.util.ItemVariant;
 import java.util.List;
 import java.util.function.Consumer;
-import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
 import net.minecraft.world.Containers;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;

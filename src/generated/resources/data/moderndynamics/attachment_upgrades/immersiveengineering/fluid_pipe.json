@@ -1,0 +1,12 @@
+{
+  "forge:conditions": [
+    {
+      "type": "forge:mod_loaded",
+      "modid": "immersiveengineering"
+    }
+  ],
+  "addFluidTransfer": 1,
+  "item": "immersiveengineering:fluid_pipe",
+  "slotLimit": 3
+}
+

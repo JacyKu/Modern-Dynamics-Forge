@@ -30,12 +30,11 @@ import dev.technici4n.moderndynamics.attachment.settings.RoutingMode;
 import dev.technici4n.moderndynamics.gui.menu.AttachedIoMenu;
 import dev.technici4n.moderndynamics.gui.menu.FluidAttachedIoMenu;
 import dev.technici4n.moderndynamics.gui.menu.ItemAttachedIoMenu;
+import dev.technici4n.moderndynamics.util.FluidVariant;
+import dev.technici4n.moderndynamics.util.ItemVariant;
 import dev.technici4n.moderndynamics.util.MdId;
 import dev.technici4n.moderndynamics.util.UnsidedPacketHandler;
 import io.netty.buffer.Unpooled;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
-import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -57,7 +56,7 @@ public class MdPackets {
     };
 
     public static void sendSetFilter(int syncId, int filterSlot, ItemVariant variant) {
-        var buffer = PacketByteBufs.create();
+        var buffer = new FriendlyByteBuf(Unpooled.buffer(64));
         buffer.writeInt(syncId);
         buffer.writeInt(filterSlot);
         variant.toPacket(buffer);
@@ -78,7 +77,7 @@ public class MdPackets {
     };
 
     public static void sendSetFilter(int syncId, int filterSlot, FluidVariant variant) {
-        var buffer = PacketByteBufs.create();
+        var buffer = new FriendlyByteBuf(Unpooled.buffer(64));
         buffer.writeInt(syncId);
         buffer.writeInt(filterSlot);
         variant.toPacket(buffer);
@@ -177,7 +176,7 @@ public class MdPackets {
             var enumValue = buf.readEnum(enumClass);
             return () -> {
                 AbstractContainerMenu handler = player.containerMenu;
-                if (handler.containerId == syncId) {
+                if (handler.containerId == syncId && menuClass.isInstance(handler)) {
                     setter.setEnum(menuClass.cast(handler), enumValue, false);
                 }
             };

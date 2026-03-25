@@ -49,10 +49,19 @@ public class IoAttachmentItem extends AttachmentItem {
 
     @Override
     public AttachedAttachment createAttached(NodeHost host, CompoundTag configTag) {
+        Runnable callback = () -> {
+            host.getPipe().setChanged();
+            if (host.getPipe().getLevel() != null && !host.getPipe().getLevel().isClientSide()) {
+                host.getPipe().invalidateHostCaches();
+                host.getPipe().scheduleHostUpdates();
+                host.getPipe().sync();
+            }
+        };
+
         if (host instanceof ItemHost) {
-            return new ItemAttachedIo(this, configTag, host.getPipe()::setChanged);
+            return new ItemAttachedIo(this, configTag, callback);
         } else {
-            return new FluidAttachedIo(this, configTag, host.getPipe()::setChanged);
+            return new FluidAttachedIo(this, configTag, callback);
         }
     }
 

@@ -5,6 +5,9 @@
   "compatibilityLevel": "JAVA_8",
   "mixins": [
   ],
+  "client": [
+    "TextureAtlasMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }

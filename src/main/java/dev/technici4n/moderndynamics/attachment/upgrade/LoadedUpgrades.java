@@ -18,14 +18,14 @@
  */
 package dev.technici4n.moderndynamics.attachment.upgrade;
 
+import dev.technici4n.moderndynamics.MdProxy;
 import dev.technici4n.moderndynamics.gui.MdPackets;
+import io.netty.buffer.Unpooled;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Item;
@@ -50,9 +50,9 @@ public class LoadedUpgrades {
     }
 
     public static void syncToClient(ServerPlayer player) {
-        var buf = PacketByteBufs.create();
+        var buf = new FriendlyByteBuf(Unpooled.buffer());
         holder.toPacket(buf);
-        ServerPlayNetworking.send(player, MdPackets.SET_ATTACHMENT_UPGRADES, buf);
+        MdProxy.INSTANCE.sendPacket(player, MdPackets.SET_ATTACHMENT_UPGRADES, buf);
     }
 
     public final Map<Item, UpgradeType> map;

@@ -19,7 +19,6 @@
 package dev.technici4n.moderndynamics.util;
 
 import dev.technici4n.moderndynamics.init.MdItems;
-import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -31,7 +30,7 @@ import net.minecraft.world.item.ItemStack;
 public final class MdItemGroup {
     public static final ResourceKey<CreativeModeTab> KEY = ResourceKey.create(Registries.CREATIVE_MODE_TAB, MdId.of(MdId.MOD_ID));
 
-    private static final CreativeModeTab INSTANCE = FabricItemGroup.builder()
+    private static final CreativeModeTab INSTANCE = CreativeModeTab.builder()
             .title(Component.translatable("itemGroup.moderndynamics.moderndynamics"))
             .icon(() -> new ItemStack(MdItems.ITEM_PIPE))
             .displayItems((params, output) -> {

@@ -29,7 +29,7 @@ import dev.technici4n.moderndynamics.attachment.settings.RoutingMode;
 import dev.technici4n.moderndynamics.gui.MdPackets;
 import dev.technici4n.moderndynamics.init.MdMenus;
 import dev.technici4n.moderndynamics.pipe.PipeBlockEntity;
-import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
+import dev.technici4n.moderndynamics.util.ItemVariant;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -38,7 +38,7 @@ import net.minecraft.world.inventory.ClickType;
 public class ItemAttachedIoMenu extends AttachedIoMenu<ItemAttachedIo> {
 
     public ItemAttachedIoMenu(int syncId, Inventory playerInventory, PipeBlockEntity pipe, Direction side, ItemAttachedIo attachment) {
-        super(MdMenus.ITEM_IO, syncId, playerInventory, pipe, side, attachment);
+        super(MdMenus.ITEM_IO.menuType(), syncId, playerInventory, pipe, side, attachment);
 
         // Config slots
         var row = 0;
@@ -60,7 +60,7 @@ public class ItemAttachedIoMenu extends AttachedIoMenu<ItemAttachedIo> {
     @Override
     public void clicked(int slotIndex, int button, ClickType actionType, Player player) {
         if (slotIndex >= 0 && getSlot(slotIndex) instanceof ItemConfigSlot configSlot && configSlot.isActive()) {
-            attachment.setFilter(configSlot.getConfigIdx(), ItemVariant.of(getCarried()));
+            setFilter(configSlot.getConfigIdx(), ItemVariant.of(getCarried()), isClientSide());
         } else {
             super.clicked(slotIndex, button, actionType, player);
         }
@@ -80,7 +80,7 @@ public class ItemAttachedIoMenu extends AttachedIoMenu<ItemAttachedIo> {
         for (var slot : slots) {
             if (slot instanceof ItemConfigSlot itemConfigSlot) {
                 if (slot.getItem().isEmpty()) {
-                    setFilter(itemConfigSlot.getConfigIdx(), itemVariant, false);
+                    setFilter(itemConfigSlot.getConfigIdx(), itemVariant, isClientSide());
                     return true;
                 }
             }

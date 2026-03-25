@@ -21,13 +21,11 @@ package dev.technici4n.moderndynamics.client.ber;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import dev.technici4n.moderndynamics.pipe.PipeBlockEntity;
-import java.util.Objects;
-import net.fabricmc.fabric.api.renderer.v1.Renderer;
-import net.fabricmc.fabric.api.renderer.v1.RendererAccess;
-import net.fabricmc.fabric.api.renderer.v1.mesh.MutableQuadView;
-import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
-import net.fabricmc.fabric.api.transfer.v1.client.fluid.FluidVariantRendering;
-import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
+import dev.technici4n.moderndynamics.thirdparty.fabric.MeshBuilderImpl;
+import dev.technici4n.moderndynamics.thirdparty.fabric.MutableQuadView;
+import dev.technici4n.moderndynamics.thirdparty.fabric.QuadEmitter;
+import dev.technici4n.moderndynamics.util.FluidRenderUtil;
+import dev.technici4n.moderndynamics.util.FluidVariant;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.OverlayTexture;
@@ -52,29 +50,24 @@ public class FluidPipeRendering {
 
     public static void drawFluidInPipe(PipeBlockEntity pipe, PoseStack ms, MultiBufferSource vcp, FluidVariant fluid, float fill) {
         int conn = pipe.getClientSideConnections();
-        var level = pipe.getLevel();
-        var pos = pipe.getBlockPos();
-
         VertexConsumer vc = vcp.getBuffer(RenderType.translucent());
-        TextureAtlasSprite sprite = FluidVariantRendering.getSprite(fluid);
+        TextureAtlasSprite sprite = FluidRenderUtil.getStillSprite(fluid);
         if (sprite == null || fill < 1e-5) {
             return;
         }
 
-        int color = FluidVariantRendering.getColor(fluid, level, pos);
+        int color = FluidRenderUtil.getTint(fluid);
         float r = ((color >> 16) & 255) / 256f;
         float g = ((color >> 8) & 255) / 256f;
         float b = (color & 255) / 256f;
 
-        Renderer renderer = RendererAccess.INSTANCE.getRenderer();
-        Objects.requireNonNull(renderer, "Please install Indium if you are using Sodium!");
-
+        var meshBuilder = new MeshBuilderImpl();
         QuadBuilder builder = (direction, x, y, z, X, Y, Z) -> {
-            var emitter = renderer.meshBuilder().getEmitter();
+            var emitter = meshBuilder.getEmitter();
             quad(emitter, direction, x, y, z, X, Y, Z);
             emitter.spriteBake(sprite, MutableQuadView.BAKE_LOCK_UV);
             emitter.color(-1, -1, -1, -1);
-            vc.putBulkData(ms.last(), emitter.toBakedQuad(sprite), r, g, b, FULL_LIGHT, OverlayTexture.NO_OVERLAY);
+            vc.putBulkData(ms.last(), emitter.toBakedQuad(sprite), r, g, b, 1, FULL_LIGHT, OverlayTexture.NO_OVERLAY, false);
         };
 
         /*

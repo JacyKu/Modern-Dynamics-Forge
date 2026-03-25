@@ -1,0 +1,29 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+issueTrackerURL="https://github.com/Technici4n/Modern-Dynamics"
+displayURL="https://www.curseforge.com/minecraft/mc-mods/modern-dynamics"
+logoFile="assets/moderndynamics/mdlogo.png"
+authors="Technici4n"
+license="LGPLv3"
+
+[[mods]]
+modId="moderndynamics"
+version="${version}"
+displayName="Modern Dynamics"
+description='''Modern item and fluid transport Minecraft mod.'''
+
+[[dependencies.moderndynamics]]
+modId="forge"
+mandatory=true
+versionRange="[47.4.6,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.moderndynamics]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.1,1.21)"
+ordering="NONE"
+side="BOTH"
+
+

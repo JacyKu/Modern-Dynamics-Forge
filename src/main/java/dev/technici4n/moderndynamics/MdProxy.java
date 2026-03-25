@@ -18,39 +18,182 @@
  */
 package dev.technici4n.moderndynamics;
 
+import dev.technici4n.moderndynamics.util.MdId;
 import dev.technici4n.moderndynamics.util.UnsidedPacketHandler;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.fabricmc.loader.api.FabricLoader;
+import io.netty.buffer.Unpooled;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.network.NetworkDirection;
+import net.minecraftforge.network.NetworkEvent;
+import net.minecraftforge.network.NetworkRegistry;
+import net.minecraftforge.network.PacketDistributor;
+import net.minecraftforge.network.simple.SimpleChannel;
 
 public class MdProxy {
-    public static final MdProxy INSTANCE = switch (FabricLoader.getInstance().getEnvironmentType()) {
-    case SERVER -> new MdProxy();
-    case CLIENT -> {
-        try {
-            yield (MdProxy) Class.forName("dev.technici4n.moderndynamics.client.ClientProxy").getConstructor().newInstance();
-        } catch (Exception exception) {
-            throw new RuntimeException("Failed to instantiate Modern Dynamics client proxy.", exception);
-        }
+    private static final String PROTOCOL_VERSION = "1";
+    private static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
+            MdId.of("main"),
+            () -> PROTOCOL_VERSION,
+            PROTOCOL_VERSION::equals,
+            PROTOCOL_VERSION::equals);
+    private static final Map<ResourceLocation, UnsidedPacketHandler> HANDLERS = new ConcurrentHashMap<>();
+
+    public static final MdProxy INSTANCE = createInstance();
+
+    static {
+        CHANNEL.messageBuilder(ServerboundRawPacket.class, 0, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(ServerboundRawPacket::encode)
+                .decoder(ServerboundRawPacket::decode)
+                .consumerNetworkThread(
+                        (BiConsumer<ServerboundRawPacket, Supplier<NetworkEvent.Context>>) (packet, contextSupplier) -> handleRawPacket(packet,
+                                contextSupplier.get()))
+                .add();
+        CHANNEL.messageBuilder(ClientboundRawPacket.class, 1, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(ClientboundRawPacket::encode)
+                .decoder(ClientboundRawPacket::decode)
+                .consumerNetworkThread(
+                        (BiConsumer<ClientboundRawPacket, Supplier<NetworkEvent.Context>>) (packet, contextSupplier) -> handleRawPacket(packet,
+                                contextSupplier.get()))
+                .add();
     }
-    };
+
+    private static MdProxy createInstance() {
+        if (net.minecraftforge.fml.loading.FMLEnvironment.dist == Dist.CLIENT) {
+            try {
+                return (MdProxy) Class.forName("dev.technici4n.moderndynamics.client.ClientProxy").getConstructor().newInstance();
+            } catch (Exception exception) {
+                throw new RuntimeException("Failed to instantiate Modern Dynamics client proxy.", exception);
+            }
+        }
+
+        return new MdProxy();
+    }
 
     public boolean isShiftDown() {
         return false;
+    }
+
+    public boolean isMemoryConnection() {
+        return false;
+    }
+
+    protected Player getClientPlayer() {
+        return null;
     }
 
     /**
      * Register a packet that can be received by both sides, server and client.
      */
     public void registerPacketHandler(ResourceLocation packetId, UnsidedPacketHandler unsidedHandler) {
-        ServerPlayNetworking.registerGlobalReceiver(packetId,
-                (ms, player, handler, buf, responseSender) -> ms.execute(unsidedHandler.handlePacket(player, buf)));
+        HANDLERS.put(packetId, unsidedHandler);
     }
 
     /**
      * Send a packet to the server.
      */
     public void sendPacket(ResourceLocation packetId, FriendlyByteBuf buf) {
+        CHANNEL.sendToServer(new ServerboundRawPacket(packetId, copyPayload(buf)));
+    }
+
+    public void sendPacket(ServerPlayer player, ResourceLocation packetId, FriendlyByteBuf buf) {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new ClientboundRawPacket(packetId, copyPayload(buf)));
+    }
+
+    private static void handleRawPacket(AbstractRawPacket packet, NetworkEvent.Context context) {
+        context.enqueueWork(() -> {
+            var handler = HANDLERS.get(packet.packetId);
+            if (handler == null) {
+                return;
+            }
+
+            Player player = context.getDirection().getReceptionSide().isServer() ? context.getSender() : INSTANCE.getClientPlayer();
+            if (player == null) {
+                return;
+            }
+
+            var buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(packet.payload));
+            try {
+                var action = handler.handlePacket(player, buf);
+                if (action != null) {
+                    action.run();
+                }
+            } catch (RuntimeException exception) {
+                ModernDynamics.LOGGER.error("Failed to handle packet {} for {}", packet.packetId, player.getGameProfile().getName(), exception);
+            } finally {
+                buf.release();
+            }
+        });
+        context.setPacketHandled(true);
+    }
+
+    private static byte[] copyPayload(FriendlyByteBuf buf) {
+        byte[] payload = new byte[buf.readableBytes()];
+        buf.getBytes(buf.readerIndex(), payload);
+        return payload;
+    }
+
+    private abstract static class AbstractRawPacket {
+        private final ResourceLocation packetId;
+        private final byte[] payload;
+
+        private AbstractRawPacket(ResourceLocation packetId, byte[] payload) {
+            this.packetId = packetId;
+            this.payload = payload;
+        }
+
+        protected ResourceLocation packetId() {
+            return packetId;
+        }
+
+        protected byte[] payload() {
+            return payload;
+        }
+
+        private static void encode(AbstractRawPacket packet, FriendlyByteBuf buf) {
+            buf.writeResourceLocation(packet.packetId());
+            buf.writeVarInt(packet.payload().length);
+            buf.writeBytes(packet.payload());
+        }
+    }
+
+    private static final class ServerboundRawPacket extends AbstractRawPacket {
+        private ServerboundRawPacket(ResourceLocation packetId, byte[] payload) {
+            super(packetId, payload);
+        }
+
+        private static void encode(ServerboundRawPacket packet, FriendlyByteBuf buf) {
+            AbstractRawPacket.encode(packet, buf);
+        }
+
+        private static ServerboundRawPacket decode(FriendlyByteBuf buf) {
+            var packetId = buf.readResourceLocation();
+            byte[] payload = new byte[buf.readVarInt()];
+            buf.readBytes(payload);
+            return new ServerboundRawPacket(packetId, payload);
+        }
+    }
+
+    private static final class ClientboundRawPacket extends AbstractRawPacket {
+        private ClientboundRawPacket(ResourceLocation packetId, byte[] payload) {
+            super(packetId, payload);
+        }
+
+        private static void encode(ClientboundRawPacket packet, FriendlyByteBuf buf) {
+            AbstractRawPacket.encode(packet, buf);
+        }
+
+        private static ClientboundRawPacket decode(FriendlyByteBuf buf) {
+            var packetId = buf.readResourceLocation();
+            byte[] payload = new byte[buf.readVarInt()];
+            buf.readBytes(payload);
+            return new ClientboundRawPacket(packetId, payload);
+        }
     }
 }

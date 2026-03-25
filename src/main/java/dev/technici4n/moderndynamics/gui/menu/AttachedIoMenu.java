@@ -71,6 +71,7 @@ public class AttachedIoMenu<A extends AttachedIo> extends AbstractContainerMenu 
     }
 
     protected <T extends Enum<T>> void syncEnum(Class<T> enumClass, Supplier<T> getter, BiConsumer<T, Boolean> setter) {
+        var enumValues = enumClass.getEnumConstants();
         addDataSlot(new DataSlot() {
             @Override
             public int get() {
@@ -79,7 +80,9 @@ public class AttachedIoMenu<A extends AttachedIo> extends AbstractContainerMenu 
 
             @Override
             public void set(int value) {
-                setter.accept(enumClass.getEnumConstants()[value], false);
+                if (value >= 0 && value < enumValues.length) {
+                    setter.accept(enumValues[value], false);
+                }
             }
         });
     }

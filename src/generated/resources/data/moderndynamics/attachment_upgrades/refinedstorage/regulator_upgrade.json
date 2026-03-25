@@ -1,0 +1,12 @@
+{
+  "forge:conditions": [
+    {
+      "type": "forge:mod_loaded",
+      "modid": "refinedstorage"
+    }
+  ],
+  "enableAdvancedBehavior": true,
+  "item": "refinedstorage:regulator_upgrade",
+  "slotLimit": 1
+}
+

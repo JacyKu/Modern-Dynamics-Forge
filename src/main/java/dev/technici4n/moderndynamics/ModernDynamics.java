@@ -19,6 +19,7 @@
 package dev.technici4n.moderndynamics;
 
 import dev.technici4n.moderndynamics.attachment.upgrade.AttachmentUpgradesLoader;
+import dev.technici4n.moderndynamics.client.ModernDynamicsClient;
 import dev.technici4n.moderndynamics.gui.MdPackets;
 import dev.technici4n.moderndynamics.init.MdAttachments;
 import dev.technici4n.moderndynamics.init.MdBlockEntities;
@@ -27,32 +28,45 @@ import dev.technici4n.moderndynamics.init.MdItems;
 import dev.technici4n.moderndynamics.init.MdMenus;
 import dev.technici4n.moderndynamics.network.NetworkManager;
 import dev.technici4n.moderndynamics.network.TickHelper;
+import dev.technici4n.moderndynamics.network.item.SimulatedInsertionTargets;
+import dev.technici4n.moderndynamics.util.MdId;
 import dev.technici4n.moderndynamics.util.MdItemGroup;
 import dev.technici4n.moderndynamics.util.WrenchHelper;
-import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.minecraft.core.registries.Registries;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.server.ServerStoppedEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.fml.loading.FMLEnvironment;
+import net.minecraftforge.registries.RegisterEvent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-public class ModernDynamics implements ModInitializer {
+@Mod(MdId.MOD_ID)
+public class ModernDynamics {
     public static final Logger LOGGER = LogManager.getLogger("Modern Dynamics");
 
-    @Override
-    public void onInitialize() {
-        MdItemGroup.init();
+    public ModernDynamics() {
+        var modBus = FMLJavaModLoadingContext.get().getModEventBus();
+        modBus.addListener(this::register);
 
-        MdBlocks.init();
-        MdItems.init();
-        MdBlockEntities.init();
-        MdAttachments.init();
-        MdMenus.init();
-
-        ServerLifecycleEvents.SERVER_STOPPED.register(server -> NetworkManager.onServerStopped());
-        ServerTickEvents.END_SERVER_TICK.register(server -> TickHelper.onEndTick());
-        ServerTickEvents.END_SERVER_TICK.register(server -> NetworkManager.onEndTick());
-        WrenchHelper.registerEvents();
+        MinecraftForge.EVENT_BUS.addListener((ServerStoppedEvent event) -> {
+            NetworkManager.onServerStopped();
+            SimulatedInsertionTargets.clear();
+        });
+        MinecraftForge.EVENT_BUS.addListener((TickEvent.ServerTickEvent event) -> {
+            if (event.phase == TickEvent.Phase.END) {
+                TickHelper.onEndTick();
+                NetworkManager.onEndTick();
+            }
+        });
+        MinecraftForge.EVENT_BUS.addListener(WrenchHelper::handleUseBlock);
         AttachmentUpgradesLoader.setup();
+
+        if (FMLEnvironment.dist.isClient()) {
+            ModernDynamicsClient.init(modBus);
+        }
 
         MdProxy.INSTANCE.registerPacketHandler(MdPackets.SET_ITEM_VARIANT, MdPackets.SET_ITEM_VARIANT_HANDLER);
         MdProxy.INSTANCE.registerPacketHandler(MdPackets.SET_FLUID_VARIANT, MdPackets.SET_FLUID_VARIANT_HANDLER);
@@ -68,5 +82,21 @@ public class ModernDynamics implements ModInitializer {
         MdProxy.INSTANCE.registerPacketHandler(MdPackets.SET_MAX_ITEMS_EXTRACTED, MdPackets.SET_MAX_ITEMS_EXTRACTED_HANDLER);
 
         LOGGER.info("Successfully loaded Modern Dynamics!");
+    }
+
+    private void register(RegisterEvent event) {
+        var registryKey = event.getRegistryKey();
+        if (registryKey == Registries.BLOCK) {
+            MdBlocks.init();
+        } else if (registryKey == Registries.ITEM) {
+            MdItems.init();
+            MdAttachments.init();
+        } else if (registryKey == Registries.BLOCK_ENTITY_TYPE) {
+            MdBlockEntities.init();
+        } else if (registryKey == Registries.MENU) {
+            MdMenus.init();
+        } else if (registryKey == Registries.CREATIVE_MODE_TAB) {
+            MdItemGroup.init();
+        }
     }
 }

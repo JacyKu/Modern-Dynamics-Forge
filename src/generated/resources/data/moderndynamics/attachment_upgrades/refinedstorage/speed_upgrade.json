@@ -1,0 +1,14 @@
+{
+  "forge:conditions": [
+    {
+      "type": "forge:mod_loaded",
+      "modid": "refinedstorage"
+    }
+  ],
+  "addItemSpeed": 1,
+  "addItemTransferFrequency": 1,
+  "item": "refinedstorage:speed_upgrade",
+  "multiplyFluidTransfer": 1,
+  "slotLimit": 3
+}
+

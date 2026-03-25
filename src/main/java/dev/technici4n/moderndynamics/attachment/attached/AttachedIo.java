@@ -72,6 +72,7 @@ public abstract class AttachedIo extends AttachedAttachment {
     public void setFilterInversion(FilterInversionMode filterInversion) {
         if (filterInversion != this.filterInversion) {
             this.filterInversion = filterInversion;
+            setChangedCallback.run();
             resetCachedFilter();
         }
     }
@@ -81,7 +82,10 @@ public abstract class AttachedIo extends AttachedAttachment {
     }
 
     public void setRedstoneMode(RedstoneMode mode) {
-        this.redstoneMode = mode;
+        if (mode != this.redstoneMode) {
+            this.redstoneMode = mode;
+            setChangedCallback.run();
+        }
     }
 
     public ItemStack getUpgrade(int slot) {

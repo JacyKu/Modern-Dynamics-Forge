@@ -1,5 +1,6 @@
 plugins {
-    id 'fabric-loom' version '1.1-SNAPSHOT'
+    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+    id 'org.parchmentmc.librarian.forgegradle' version '1.+'
     id 'maven-publish'
     id 'com.diffplug.spotless' version '5.14.0'
     id 'com.matthewprenger.cursegradle' version '1.4.0'
@@ -12,14 +13,23 @@ targetCompatibility = JavaVersion.VERSION_17
 archivesBaseName = project.archives_base_name
 version = System.getenv("MOD_VERSION")
         ? System.getenv("MOD_VERSION")
-        : "local"
+        : "0.0.1-alpha"
 group = project.maven_group
 
 repositories {
     maven {
-        url "https://maven.parchmentmc.net/"
+        name = 'Forge'
+        url = 'https://maven.minecraftforge.net/'
+    }
+    maven {
+        name = 'ParchmentMC'
+        url = 'https://maven.parchmentmc.org/'
+    }
+    maven {
+        name = 'Modrinth'
+        url = 'https://api.modrinth.com/maven'
         content {
-            includeGroup "org.parchmentmc.data"
+            includeGroup 'maven.modrinth'
         }
     }
     maven {
@@ -39,13 +49,6 @@ repositories {
         }
     }
     maven {
-        url 'https://maven.bai.lol'
-        content {
-            includeGroup "lol.bai"
-            includeGroup "mcp.mobius.waila"
-        }
-    }
-    maven {
         name 'modmaven'
         url "https://modmaven.dev/"
         content {
@@ -55,129 +58,133 @@ repositories {
 }
 
 dependencies {
-    // To change the versions see the gradle.properties file
-    minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings loom.layered() {
-        officialMojangMappings()
-        parchment("org.parchmentmc.data:parchment-1.20.1:2023.08.13@zip")
-    }
-    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    minecraft "net.minecraftforge:forge:${project.minecraft_version}-${project.forge_version}"
 
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
-    include modImplementation("teamreborn:energy:${project.energy_version}")
+    compileOnly fg.deobf("maven.modrinth:ae2:${project.ae2_version}")
+    compileOnly fg.deobf("maven.modrinth:thermal-expansion:${project.thermal_expansion_version}")
+    // Also load them in local dev runs so interoperability can be tested in-game.
+    runtimeOnly fg.deobf("maven.modrinth:ae2:${project.ae2_version}")
+    runtimeOnly fg.deobf("maven.modrinth:guideme:${project.guideme_version}")
+    runtimeOnly fg.deobf("maven.modrinth:cofh-core:${project.cofh_core_version}")
+    runtimeOnly fg.deobf("maven.modrinth:thermal-foundation:${project.thermal_version}")
+    runtimeOnly fg.deobf("maven.modrinth:thermal-expansion:${project.thermal_expansion_version}")
 
-    if (project.runtime_itemlist_mod == "jei") {
-        modImplementation("mezz.jei:jei-${project.jei_minecraft_version}-fabric:${project.jei_version}") {
-            exclude group: "mezz.jei"
-        }
-    } else {
-        modCompileOnly("mezz.jei:jei-${project.jei_minecraft_version}-fabric:${project.jei_version}") {
-            exclude group: "mezz.jei"
-        }
-    }
 
-    if (project.runtime_itemlist_mod == "rei") {
-        modImplementation("me.shedaniel:RoughlyEnoughItems-fabric:${project.rei_version}") {
-            exclude(group: "net.fabricmc.fabric-api")
-        }
-    } else {
-        modCompileOnly("me.shedaniel:RoughlyEnoughItems-fabric:${project.rei_version}") {
-            exclude group: "net.fabricmc.fabric-api"
-        }
+    compileOnly(fg.deobf("mezz.jei:jei-${project.jei_minecraft_version}-forge:${project.jei_version}")) {
+        exclude group: "mezz.jei"
     }
+    runtimeOnly(fg.deobf("mezz.jei:jei-${project.jei_minecraft_version}-forge:${project.jei_version}")) {
+        exclude group: "mezz.jei"
+    }
+    compileOnly fg.deobf("me.shedaniel:RoughlyEnoughItems-forge:${project.rei_version}")
+    // REI's Forge POM declares these transitive compile dependencies, but they are not exposed
+    // reliably through fg.deobf for source compilation, so declare them explicitly.
+    compileOnly fg.deobf("dev.architectury:architectury-forge:9.0.7")
+    compileOnly fg.deobf("me.shedaniel.cloth:cloth-config-forge:11.0.99")
 
-    if (project.runtime_itemlist_mod == "emi") {
-        modImplementation("dev.emi:emi-fabric:${project.emi_version}+${project.emi_minecraft_version}") {
-            exclude group: "net.fabricmc.fabric-api"
-        }
-    } else {
-        modCompileOnly("dev.emi:emi-fabric:${project.emi_version}+${project.emi_minecraft_version}") {
-            exclude group: "net.fabricmc.fabric-api"
-        }
-    }
+    compileOnly fg.deobf("dev.emi:emi-forge:${project.emi_version}+${project.emi_minecraft_version}")
+//    runtimeOnly fg.deobf("dev.emi:emi-forge:${project.emi_version}+${project.emi_minecraft_version}")
 
-    if (!(project.runtime_itemlist_mod in ["jei", "rei", "emi"])) {
-        throw new GradleException("Invalid runtime_itemlist_mod value: " + project.runtime_itemlist_mod)
-    }
+}
 
-    modRuntimeOnly("mcp.mobius.waila:wthit:fabric-${project.wthit_version}") {
-        exclude group: "net.fabricmc.fabric-api"
-    }
+def processResourcesOutput = layout.buildDirectory.dir('resources/main')
+
+tasks.register('cleanProcessResourcesOutput', Delete) {
+    delete(processResourcesOutput)
 }
 
 processResources {
     inputs.property "version", project.version
+    dependsOn tasks.named('cleanProcessResourcesOutput')
 
-    filesMatching("fabric.mod.json") {
+    filesMatching("META-INF/mods.toml") {
         expand "version": project.version
     }
 }
 
-loom {
-    splitEnvironmentSourceSets()
-}
-
 sourceSets {
     main {
+        java {
+            srcDir "src/client/java"
+            exclude "dev/technici4n/moderndynamics/client/data/**"
+            exclude "dev/technici4n/moderndynamics/client/model/MdModelLoader.java"
+            exclude "dev/technici4n/moderndynamics/data/**"
+            exclude "dev/technici4n/moderndynamics/compat/mi/**"
+            exclude "dev/technici4n/moderndynamics/network/mienergy/**"
+            exclude "dev/technici4n/moderndynamics/network/energy/**"
+            exclude "dev/technici4n/moderndynamics/pipe/EnergyPipeBlockEntity.java"
+            exclude "dev/technici4n/moderndynamics/pipe/MIEnergyCableBlockEntity.java"
+            exclude "dev/technici4n/moderndynamics/test/**"
+        }
         resources {
             srcDir "src/generated/resources"
+            exclude "fabric.mod.json"
+            exclude "moderndynamics.accesswidener"
+            exclude "data/moderndynamics/recipes/cable/**"
+            exclude "data/moderndynamics/advancements/recipes/cable/**"
+            exclude "data/moderndynamics/loot_tables/blocks/lv_cable.json"
+            exclude "data/moderndynamics/loot_tables/blocks/mv_cable.json"
+            exclude "data/moderndynamics/loot_tables/blocks/hv_cable.json"
+            exclude "data/moderndynamics/loot_tables/blocks/ev_cable.json"
+            exclude "data/moderndynamics/loot_tables/blocks/superconductor_cable.json"
         }
     }
 }
 
-loom {
-    accessWidenerPath = file("src/main/resources/moderndynamics.accesswidener")
-
-    mods {
-        moderndynamics {
-            sourceSet sourceSets.main
-            sourceSet sourceSets.client
-        }
-    }
+minecraft {
+    mappings channel: 'parchment', version: "${project.parchment_version}-${project.minecraft_version}"
+    copyIdeResources = true
 
     runs {
-        datagenClient {
-            client()
-            name "Data Generation"
-            vmArg "-Dfabric-api.datagen"
-            vmArg "-Dfabric-api.datagen.output-dir=${file("src/generated/resources")}"
+        configureEach {
+            workingDirectory project.file('run')
+            property 'mixin.env.remapRefMap', 'true'
+            property 'mixin.env.refMapRemappingFile', "${projectDir}/build/createSrgToMcp/output.srg"
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
 
-            ideConfigGenerated = true
-            runDir "build/datagen"
+            mods {
+                moderndynamics {
+                    source sourceSets.main
+                }
+            }
         }
 
-        // Use to run the tests
-        gametest {
-            server()
-            name "Game Test"
-            vmArg "-Dfabric-api.gametest"
-            vmArg "-Dfabric-api.gametest.report-file=${project.buildDir}/junit.xml"
-            runDir "build/gametest"
+        client {
+            property 'forge.enabledGameTestNamespaces', 'moderndynamics'
+        }
+
+        server {
+            property 'forge.enabledGameTestNamespaces', 'moderndynamics'
+            arg '--nogui'
+        }
+
+        data {
+            workingDirectory project.file('run-data')
+            args '--mod', 'moderndynamics', '--all', '--output', file('src/generated/resources').absolutePath, '--existing',
+                    file('src/main/resources').absolutePath
         }
     }
-}
-
-test.dependsOn runGametest
-
-tasks.withType(JavaCompile).configureEach {
-    // Minecraft 1.18 (1.18-pre2) upwards uses Java 17.
-    it.options.release = 17
 }
 
 java {
-    // Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
-    // if it is present.
-    // If you remove this line, sources will not be generated.
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
     withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 17
 }
 
 jar {
     from("LICENSE") {
-        rename { "${it}_${project.archivesBaseName}"}
+        rename { "${it}_${project.archivesBaseName}" }
     }
 }
 
-// configure the maven publication
 publishing {
     publications {
         mavenJava(MavenPublication) {
@@ -185,12 +192,7 @@ publishing {
         }
     }
 
-    // See https://docs.gradle.org/current/userguide/publishing_maven.html for information on how to set up publishing.
     repositories {
-        // Add repositories to publish to here.
-        // Notice: This block does NOT have the same function as the block in the top level.
-        // The repositories here will be used for publishing your artifact, not for
-        // retrieving dependencies.
     }
 }
 
@@ -204,8 +206,6 @@ spotless {
     }
     java {
         importOrder()
-
-        removeUnusedImports()
 
         eclipse().configFile('eclipse-format.xml')
 
@@ -262,7 +262,6 @@ if (version.toLowerCase().contains("alpha")) {
     changelog = "This is a beta release. It is expected to be mostly stable, but in any case please report any issue you may find.\n\n" + changelog
 }
 
-// Publishing
 if (System.getenv("CURSEFORGE_API_KEY") && !version.endsWith("-SNAPSHOT")) {
     curseforge {
         apiKey = System.getenv().get("CURSEFORGE_API_KEY")
@@ -273,13 +272,10 @@ if (System.getenv("CURSEFORGE_API_KEY") && !version.endsWith("-SNAPSHOT")) {
             delegate.changelog = changelog
 
             addGameVersion "1.20.1"
-            addGameVersion "Fabric"
+            addGameVersion "Forge"
             addGameVersion "Java 17"
 
-            relations {
-                requiredDependency "fabric-api"
-            }
-            mainArtifact(remapJar.archiveFile) {
+            mainArtifact(jar.archiveFile) {
                 displayName = "Modern Dynamics v${version}"
             }
         }
@@ -287,7 +283,7 @@ if (System.getenv("CURSEFORGE_API_KEY") && !version.endsWith("-SNAPSHOT")) {
             forgeGradleIntegration = false
         }
         afterEvaluate {
-            tasks.getByName("curseforge${project.curseforge_project}").dependsOn remapJar
+            tasks.getByName("curseforge${project.curseforge_project}").dependsOn jar
         }
     }
 }
@@ -300,11 +296,8 @@ if (System.getenv("MODRINTH_API_KEY") && !version.endsWith("-SNAPSHOT")) {
         versionName = "Modern Dynamics v${version}"
         delegate.changelog = changelog
         versionType = releaseChannel.toUpperCase()
-        uploadFile = remapJar.archiveFile
+        uploadFile = jar.archiveFile
         gameVersions = ["1.20.1"]
-        loaders = ["fabric"]
-        dependencies {
-            required.project "fabric-api"
-        }
+        loaders = ["forge"]
     }
 }

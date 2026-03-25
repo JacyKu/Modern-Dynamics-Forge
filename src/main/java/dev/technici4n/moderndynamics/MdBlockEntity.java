@@ -23,6 +23,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
@@ -92,7 +93,8 @@ public abstract class MdBlockEntity extends BlockEntity {
         if (!level.isClientSide())
             throw new IllegalStateException("Cannot call remesh() on the server!");
 
-        level.sendBlockUpdated(worldPosition, null, null, 0);
+        BlockState state = getBlockState();
+        level.sendBlockUpdated(worldPosition, state, state, Block.UPDATE_CLIENTS);
     }
 
     protected final boolean isClientSide() {

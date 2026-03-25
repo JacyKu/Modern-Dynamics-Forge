@@ -1,13 +1,11 @@
-{
-  "fabric:load_conditions": [
-    {
-      "condition": "fabric:all_mods_loaded",
-      "values": [
-        "ae2"
-      ]
-    }
-  ],
-  "enableAdvancedBehavior": true,
-  "item": "ae2:fuzzy_card",
-  "slotLimit": 1
+﻿{
+    "enableAdvancedBehavior":  true,
+    "item":  "ae2:fuzzy_card",
+    "slotLimit":  1,
+    "forge:conditions":  [
+                             {
+                                 "type":  "forge:mod_loaded",
+                                 "modid":  "ae2"
+                             }
+                         ]
 }

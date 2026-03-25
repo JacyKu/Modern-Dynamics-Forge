@@ -31,13 +31,11 @@ import dev.technici4n.moderndynamics.init.MdMenus;
 import dev.technici4n.moderndynamics.model.AttachmentModelData;
 import dev.technici4n.moderndynamics.pipe.PipeBlockEntity;
 import dev.technici4n.moderndynamics.util.DropHelper;
+import dev.technici4n.moderndynamics.util.ItemVariant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
-import net.fabricmc.fabric.api.transfer.v1.storage.Storage;
-import net.fabricmc.fabric.api.transfer.v1.transaction.Transaction;
 import net.minecraft.core.Direction;
 import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
@@ -46,6 +44,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.util.Mth;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.items.IItemHandler;
 import org.jetbrains.annotations.Nullable;
 
 public class ItemAttachedIo extends AttachedIo {
@@ -96,13 +95,15 @@ public class ItemAttachedIo extends AttachedIo {
         this.filterSimilar = readEnum(FilterSimilarMode.values(), configData, "filterSimilar", FilterSimilarMode.IGNORE_SIMILAR);
         this.routingMode = readEnum(RoutingMode.values(), configData, "routingMode", RoutingMode.CLOSEST);
         this.oversendingMode = readEnum(OversendingMode.values(), configData, "oversendingMode", OversendingMode.PREVENT_OVERSENDING);
+        int maxItemsExtractedMaximum = getMaxItemsExtractedMaximum();
         if (configData.contains("maxItemsExtracted", Tag.TAG_INT)) {
-            setMaxItemsExtracted(configData.getInt("maxItemsExtracted"));
+            this.maxItemsExtracted = Mth.clamp(configData.getInt("maxItemsExtracted"), 1, maxItemsExtractedMaximum);
         } else {
-            setMaxItemsExtracted(getMaxItemsExtractedMaximum());
+            this.maxItemsExtracted = maxItemsExtractedMaximum;
         }
+        this.maxItemsExtractedAtMax = this.maxItemsExtracted == maxItemsExtractedMaximum;
         this.maxItemsInInventory = configData.getInt("maxItemsInInventory");
-        this.maxItemsInInventory = Mth.clamp(this.maxItemsInInventory, 0, getMaxItemsExtractedMaximum());
+        this.maxItemsInInventory = Mth.clamp(this.maxItemsInInventory, 0, maxItemsExtractedMaximum);
 
         this.stuffedItems.clear();
         var stuffedTag = configData.getList("stuffed", CompoundTag.TAG_COMPOUND);
@@ -248,6 +249,7 @@ public class ItemAttachedIo extends AttachedIo {
         if (filterDamage != this.filterDamage) {
             this.filterDamage = filterDamage;
             resetCachedFilter();
+            setChangedCallback.run();
         }
     }
 
@@ -259,6 +261,7 @@ public class ItemAttachedIo extends AttachedIo {
         if (filterNbt != this.filterNbt) {
             this.filterNbt = filterNbt;
             resetCachedFilter();
+            setChangedCallback.run();
         }
     }
 
@@ -270,6 +273,7 @@ public class ItemAttachedIo extends AttachedIo {
         if (filterMod != this.filterMod) {
             this.filterMod = filterMod;
             resetCachedFilter();
+            setChangedCallback.run();
         }
     }
 
@@ -281,6 +285,7 @@ public class ItemAttachedIo extends AttachedIo {
         if (value != this.filterSimilar) {
             this.filterSimilar = value;
             resetCachedFilter();
+            setChangedCallback.run();
         }
     }
 
@@ -289,7 +294,10 @@ public class ItemAttachedIo extends AttachedIo {
     }
 
     public void setRoutingMode(RoutingMode mode) {
-        this.routingMode = mode;
+        if (mode != this.routingMode) {
+            this.routingMode = mode;
+            setChangedCallback.run();
+        }
     }
 
     public OversendingMode getOversendingMode() {
@@ -297,7 +305,10 @@ public class ItemAttachedIo extends AttachedIo {
     }
 
     public void setOversendingMode(OversendingMode mode) {
-        this.oversendingMode = mode;
+        if (mode != this.oversendingMode) {
+            this.oversendingMode = mode;
+            setChangedCallback.run();
+        }
     }
 
     public int getMaxItemsInInventory() {
@@ -305,7 +316,11 @@ public class ItemAttachedIo extends AttachedIo {
     }
 
     public void setMaxItemsInInventory(int value) {
-        this.maxItemsInInventory = Mth.clamp(value, 0, Integer.MAX_VALUE);
+        int clamped = Mth.clamp(value, 0, Integer.MAX_VALUE);
+        if (clamped != this.maxItemsInInventory) {
+            this.maxItemsInInventory = clamped;
+            setChangedCallback.run();
+        }
     }
 
     public int getMaxItemsExtracted() {
@@ -313,9 +328,15 @@ public class ItemAttachedIo extends AttachedIo {
     }
 
     public void setMaxItemsExtracted(int value) {
-        this.maxItemsExtracted = Mth.clamp(value, 1, getMaxItemsExtractedMaximum());
+        int max = getMaxItemsExtractedMaximum();
+        int clamped = Mth.clamp(value, 1, max);
+        boolean atMax = clamped == max;
 
-        this.maxItemsExtractedAtMax = maxItemsExtracted == getMaxItemsExtractedMaximum();
+        if (clamped != this.maxItemsExtracted || atMax != this.maxItemsExtractedAtMax) {
+            this.maxItemsExtracted = clamped;
+            this.maxItemsExtractedAtMax = atMax;
+            setChangedCallback.run();
+        }
     }
 
     public int getMaxItemsExtractedMaximum() {
@@ -356,27 +377,26 @@ public class ItemAttachedIo extends AttachedIo {
         }
     }
 
-    public long moveStuffedToStorage(Storage<ItemVariant> targetStorage, long maxAmount) {
-        long totalMoved = 0;
+    public int moveStuffedToStorage(IItemHandler targetStorage, int maxAmount) {
+        int totalMoved = 0;
 
-        try (var tx = Transaction.openOuter()) {
-            for (var it = stuffedItems.entrySet().iterator(); it.hasNext() && totalMoved < maxAmount;) {
-                var entry = it.next();
-                long stuffedAmount = entry.getValue();
-                long inserted = targetStorage.insert(entry.getKey(), Math.min(stuffedAmount, maxAmount - totalMoved), tx);
+        for (var it = stuffedItems.entrySet().iterator(); it.hasNext() && totalMoved < maxAmount;) {
+            var entry = it.next();
+            int stuffedAmount = Math.toIntExact(entry.getValue());
+            int inserted = dev.technici4n.moderndynamics.util.TransferUtil.insertItemStacked(
+                    targetStorage,
+                    entry.getKey(),
+                    Math.min(stuffedAmount, maxAmount - totalMoved));
 
-                if (inserted > 0) {
-                    totalMoved += inserted;
+            if (inserted > 0) {
+                totalMoved += inserted;
 
-                    if (inserted < stuffedAmount) {
-                        entry.setValue(stuffedAmount - inserted);
-                    } else {
-                        it.remove();
-                    }
+                if (inserted < stuffedAmount) {
+                    entry.setValue((long) stuffedAmount - inserted);
+                } else {
+                    it.remove();
                 }
             }
-
-            tx.commit();
         }
 
         return totalMoved;

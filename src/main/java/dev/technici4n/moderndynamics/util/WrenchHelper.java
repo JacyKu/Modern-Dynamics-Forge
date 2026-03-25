@@ -20,12 +20,12 @@ package dev.technici4n.moderndynamics.util;
 
 import dev.technici4n.moderndynamics.MdBlock;
 import dev.technici4n.moderndynamics.init.MdTags;
-import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 
 /**
  * Helper to detect if items are wrenches, and to make wrench shift-clicking dismantle MT pipes.
@@ -38,29 +38,31 @@ public class WrenchHelper {
     /**
      * Dismantle target pipe on shift right-click with a wrench.
      */
-    public static void registerEvents() {
-        UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
-            if (player.isSpectator() || !player.isShiftKeyDown() || !world.mayInteract(player, hitResult.getBlockPos())
-                    || !isWrench(player.getItemInHand(hand))) {
-                return InteractionResult.PASS;
-            }
+    public static void handleUseBlock(PlayerInteractEvent.RightClickBlock event) {
+        var player = event.getEntity();
+        var world = event.getLevel();
+        var hand = event.getHand();
+        var hitResult = event.getHitVec();
 
-            var pos = hitResult.getBlockPos();
-            var state = world.getBlockState(pos);
-            if (state.getBlock() instanceof MdBlock) {
-                var entity = world.getBlockEntity(pos);
-                world.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
-                if (!player.isCreative()) {
-                    Block.dropResources(state, world, pos, entity);
-                }
-                // Play a cool sound
-                var group = state.getSoundType();
-                world.playSound(player, pos, group.getBreakSound(), SoundSource.BLOCKS, (group.getVolume() + 1.0F) / 2.0F,
-                        group.getPitch() * 0.8F);
-                return InteractionResult.sidedSuccess(world.isClientSide);
-            }
+        if (player.isSpectator() || !player.isShiftKeyDown() || !world.mayInteract(player, hitResult.getBlockPos())
+                || !isWrench(player.getItemInHand(hand))) {
+            return;
+        }
 
-            return InteractionResult.PASS;
-        });
+        var pos = hitResult.getBlockPos();
+        var state = world.getBlockState(pos);
+        if (state.getBlock() instanceof MdBlock) {
+            var entity = world.getBlockEntity(pos);
+            world.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
+            if (!player.isCreative()) {
+                Block.dropResources(state, world, pos, entity);
+            }
+            var group = state.getSoundType();
+            world.playSound(player, pos, group.getBreakSound(), SoundSource.BLOCKS, (group.getVolume() + 1.0F) / 2.0F,
+                    group.getPitch() * 0.8F);
+
+            event.setCancellationResult(InteractionResult.sidedSuccess(world.isClientSide));
+            event.setCanceled(true);
+        }
     }
 }

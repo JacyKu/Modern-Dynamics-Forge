@@ -1,0 +1,6 @@
+{
+  "loader": "moderndynamics:pipe",
+  "pipeType": "item_pipe",
+  "transparent": true
+}
+

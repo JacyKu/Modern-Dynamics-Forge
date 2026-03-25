@@ -23,20 +23,17 @@ import dev.technici4n.moderndynamics.attachment.attached.FluidAttachedIo;
 import dev.technici4n.moderndynamics.gui.MdPackets;
 import dev.technici4n.moderndynamics.init.MdMenus;
 import dev.technici4n.moderndynamics.pipe.PipeBlockEntity;
-import java.util.Objects;
-import net.fabricmc.fabric.api.transfer.v1.context.ContainerItemContext;
-import net.fabricmc.fabric.api.transfer.v1.fluid.FluidStorage;
-import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
-import net.fabricmc.fabric.api.transfer.v1.storage.StorageUtil;
+import dev.technici4n.moderndynamics.util.FluidVariant;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ClickType;
+import net.minecraftforge.fluids.FluidUtil;
 
 public class FluidAttachedIoMenu extends AttachedIoMenu<FluidAttachedIo> {
 
     public FluidAttachedIoMenu(int syncId, Inventory playerInventory, PipeBlockEntity pipe, Direction side, FluidAttachedIo attachment) {
-        super(MdMenus.FLUID_IO, syncId, playerInventory, pipe, side, attachment);
+        super(MdMenus.FLUID_IO.menuType(), syncId, playerInventory, pipe, side, attachment);
 
         // Config slots
         var row = 0;
@@ -53,10 +50,10 @@ public class FluidAttachedIoMenu extends AttachedIoMenu<FluidAttachedIo> {
     @Override
     public void clicked(int slotIndex, int button, ClickType actionType, Player player) {
         if (slotIndex >= 0 && getSlot(slotIndex) instanceof FluidConfigSlot configSlot && configSlot.isActive()) {
-            var selectedVariant = Objects.requireNonNullElse(
-                    StorageUtil.findStoredResource(ContainerItemContext.ofPlayerCursor(player, this).find(FluidStorage.ITEM)),
-                    FluidVariant.blank());
-            attachment.setFilter(configSlot.getConfigIdx(), selectedVariant);
+            var selectedVariant = FluidUtil.getFluidContained(getCarried())
+                    .map(FluidVariant::of)
+                    .orElse(FluidVariant.blank());
+            setFilter(configSlot.getConfigIdx(), selectedVariant, isClientSide());
         } else {
             super.clicked(slotIndex, button, actionType, player);
         }
@@ -64,24 +61,22 @@ public class FluidAttachedIoMenu extends AttachedIoMenu<FluidAttachedIo> {
 
     @Override
     protected boolean trySetFilterOnShiftClick(int clickedSlot) {
-        // Find resource that's not configured yet
-        var fluidVariant = StorageUtil.findStoredResource(
-                ContainerItemContext.withConstant(slots.get(clickedSlot).getItem()).find(FluidStorage.ITEM),
-                fv -> {
+        var fluidVariant = FluidUtil.getFluidContained(slots.get(clickedSlot).getItem())
+                .map(FluidVariant::of)
+                .filter(fv -> {
                     for (var slot : slots) {
-                        if (slot instanceof FluidConfigSlot fluidConfig) {
-                            if (fluidConfig.getFilter().equals(fv)) {
-                                return false;
-                            }
+                        if (slot instanceof FluidConfigSlot fluidConfig && fluidConfig.getFilter().equals(fv)) {
+                            return false;
                         }
                     }
                     return true;
-                });
+                })
+                .orElse(null);
         if (fluidVariant != null) {
             for (var slot : slots) {
                 if (slot instanceof FluidConfigSlot fluidConfig) {
                     if (fluidConfig.getFilter().isBlank()) {
-                        setFilter(fluidConfig.getConfigIdx(), fluidVariant, false);
+                        setFilter(fluidConfig.getConfigIdx(), fluidVariant, isClientSide());
                         return true;
                     }
                 }
