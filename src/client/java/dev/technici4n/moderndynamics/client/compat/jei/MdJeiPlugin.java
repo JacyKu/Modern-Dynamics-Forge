@@ -18,7 +18,7 @@
  */
 package dev.technici4n.moderndynamics.client.compat.jei;
 
-import dev.technici4n.moderndynamics.attachment.upgrade.LoadedUpgrades;
+import dev.technici4n.moderndynamics.client.attachment.ClientAttachmentUpgrades;
 import dev.technici4n.moderndynamics.client.screen.AttachedIoScreen;
 import dev.technici4n.moderndynamics.gui.menu.FluidConfigSlot;
 import dev.technici4n.moderndynamics.init.MdItems;
@@ -62,10 +62,12 @@ public class MdJeiPlugin implements IModPlugin {
 
     @Override
     public void registerRecipes(IRecipeRegistration registration) {
+        var loadedUpgrades = ClientAttachmentUpgrades.ensureLoaded();
+
         registration.addRecipes(
                 UpgradeCategory.TYPE,
-                LoadedUpgrades.get().list.stream()
-                        .map(u -> new UpgradeDisplay(u, LoadedUpgrades.getType(u)))
+                loadedUpgrades.list.stream()
+                        .map(u -> new UpgradeDisplay(u, loadedUpgrades.map.get(u)))
                         .toList());
     }
 

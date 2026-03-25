@@ -25,7 +25,7 @@ import dev.emi.emi.api.forge.ForgeEmiStack;
 import dev.emi.emi.api.stack.EmiStack;
 import dev.emi.emi.api.stack.EmiStackInteraction;
 import dev.emi.emi.api.widget.Bounds;
-import dev.technici4n.moderndynamics.attachment.upgrade.LoadedUpgrades;
+import dev.technici4n.moderndynamics.client.attachment.ClientAttachmentUpgrades;
 import dev.technici4n.moderndynamics.client.screen.AttachedIoScreen;
 import dev.technici4n.moderndynamics.gui.menu.FluidConfigSlot;
 import dev.technici4n.moderndynamics.init.MdItems;
@@ -35,14 +35,16 @@ import java.util.List;
 public class MdEmiPlugin implements EmiPlugin {
     @Override
     public void register(EmiRegistry registry) {
+        var loadedUpgrades = ClientAttachmentUpgrades.ensureLoaded();
+
         registry.addCategory(UpgradeRecipe.CATEGORY);
 
         for (var workstation : List.of(MdItems.ATTRACTOR, MdItems.EXTRACTOR, MdItems.FILTER)) {
             registry.addWorkstation(UpgradeRecipe.CATEGORY, EmiStack.of(workstation));
         }
 
-        for (var u : LoadedUpgrades.get().list) {
-            registry.addRecipe(new UpgradeRecipe(u, LoadedUpgrades.getType(u)));
+        for (var u : loadedUpgrades.list) {
+            registry.addRecipe(new UpgradeRecipe(u, loadedUpgrades.map.get(u)));
         }
 
         registry.addGenericExclusionArea((screen, bounds) -> {

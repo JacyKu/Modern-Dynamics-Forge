@@ -21,7 +21,7 @@ package dev.technici4n.moderndynamics.client.compat.rei;
 import dev.architectury.event.CompoundEventResult;
 import dev.architectury.fluid.FluidStack;
 import dev.architectury.hooks.fluid.forge.FluidStackHooksForge;
-import dev.technici4n.moderndynamics.attachment.upgrade.LoadedUpgrades;
+import dev.technici4n.moderndynamics.client.attachment.ClientAttachmentUpgrades;
 import dev.technici4n.moderndynamics.client.screen.AttachedIoScreen;
 import dev.technici4n.moderndynamics.client.screen.FluidAttachedIoScreen;
 import dev.technici4n.moderndynamics.client.screen.ItemAttachedIoScreen;
@@ -44,10 +44,12 @@ import me.shedaniel.rei.api.client.registry.display.DisplayRegistry;
 import me.shedaniel.rei.api.client.registry.screen.ExclusionZones;
 import me.shedaniel.rei.api.client.registry.screen.ScreenRegistry;
 import me.shedaniel.rei.api.common.util.EntryStacks;
+import me.shedaniel.rei.forge.REIPluginClient;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
+@REIPluginClient
 public class MdReiPlugin implements REIClientPlugin {
     @Override
     public void registerCategories(CategoryRegistry registry) {
@@ -72,8 +74,10 @@ public class MdReiPlugin implements REIClientPlugin {
 
     @Override
     public void registerDisplays(DisplayRegistry registry) {
-        for (var upgradeItem : LoadedUpgrades.get().list) {
-            registry.add(new UpgradeDisplay(upgradeItem, LoadedUpgrades.getType(upgradeItem)));
+        var loadedUpgrades = ClientAttachmentUpgrades.ensureLoaded();
+
+        for (var upgradeItem : loadedUpgrades.list) {
+            registry.add(new UpgradeDisplay(upgradeItem, loadedUpgrades.map.get(upgradeItem)));
         }
     }
 

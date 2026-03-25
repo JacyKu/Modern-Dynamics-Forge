@@ -20,6 +20,7 @@ package dev.technici4n.moderndynamics.client;
 
 import dev.technici4n.moderndynamics.MdProxy;
 import dev.technici4n.moderndynamics.attachment.RenderedAttachment;
+import dev.technici4n.moderndynamics.client.attachment.ClientAttachmentUpgrades;
 import dev.technici4n.moderndynamics.client.attachment.SetAttachmentUpgradesPacket;
 import dev.technici4n.moderndynamics.client.ber.PipeBlockEntityRenderer;
 import dev.technici4n.moderndynamics.client.model.PipeModelLoader;
@@ -41,6 +42,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.HitResult;
 import net.minecraftforge.client.event.EntityRenderersEvent;
 import net.minecraftforge.client.event.ModelEvent;
+import net.minecraftforge.client.event.RegisterClientReloadListenersEvent;
 import net.minecraftforge.client.event.RenderHighlightEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
@@ -54,6 +56,7 @@ public final class ModernDynamicsClient {
         modBus.addListener(ModernDynamicsClient::onClientSetup);
         modBus.addListener(ModernDynamicsClient::registerGeometryLoaders);
         modBus.addListener(ModernDynamicsClient::registerRenderers);
+        modBus.addListener(ModernDynamicsClient::registerClientReloadListeners);
 
         MinecraftForge.EVENT_BUS.addListener(ModernDynamicsClient::onClientTick);
         MinecraftForge.EVENT_BUS.addListener(ModernDynamicsClient::renderPipeAttachmentOutline);
@@ -77,6 +80,10 @@ public final class ModernDynamicsClient {
             MenuScreens.register(MdMenus.ITEM_IO.menuType(), ItemAttachedIoScreen::new);
             MenuScreens.register(MdMenus.FLUID_IO.menuType(), FluidAttachedIoScreen::new);
         });
+    }
+
+    private static void registerClientReloadListeners(RegisterClientReloadListenersEvent event) {
+        ClientAttachmentUpgrades.registerReloadListeners(event);
     }
 
     private static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {

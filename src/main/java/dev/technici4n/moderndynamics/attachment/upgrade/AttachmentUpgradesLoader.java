@@ -53,8 +53,11 @@ public class AttachmentUpgradesLoader extends SimplePreparableReloadListener<Lis
     private AttachmentUpgradesLoader() {
     }
 
-    @Override
-    protected List<JsonObject> prepare(ResourceManager resourceManager, ProfilerFiller profiler) {
+    public static LoadedUpgrades load(ResourceManager resourceManager) {
+        return parseEntries(collectEntries(resourceManager));
+    }
+
+    private static List<JsonObject> collectEntries(ResourceManager resourceManager) {
         List<JsonObject> result = new ArrayList<>();
 
         for (var entry : resourceManager.listResources("attachment_upgrades", s -> s.getPath().endsWith(".json")).entrySet()) {
@@ -71,8 +74,7 @@ public class AttachmentUpgradesLoader extends SimplePreparableReloadListener<Lis
         return result;
     }
 
-    @Override
-    protected void apply(List<JsonObject> array, ResourceManager resourceManager, ProfilerFiller profiler) {
+    private static LoadedUpgrades parseEntries(List<JsonObject> array) {
         Map<Item, UpgradeType> map = new IdentityHashMap<>();
         List<Item> list = new ArrayList<>();
 
@@ -95,7 +97,17 @@ public class AttachmentUpgradesLoader extends SimplePreparableReloadListener<Lis
             }
         }
 
-        LOADED_UPGRADES.put(resourceManager, new LoadedUpgrades(map, list));
+        return new LoadedUpgrades(map, list);
+    }
+
+    @Override
+    protected List<JsonObject> prepare(ResourceManager resourceManager, ProfilerFiller profiler) {
+        return collectEntries(resourceManager);
+    }
+
+    @Override
+    protected void apply(List<JsonObject> array, ResourceManager resourceManager, ProfilerFiller profiler) {
+        LOADED_UPGRADES.put(resourceManager, parseEntries(array));
     }
 
     public static void setup() {

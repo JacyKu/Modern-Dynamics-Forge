@@ -13,7 +13,7 @@ targetCompatibility = JavaVersion.VERSION_17
 archivesBaseName = project.archives_base_name
 version = System.getenv("MOD_VERSION")
         ? System.getenv("MOD_VERSION")
-        : "0.0.1-alpha"
+        : "0.0.2-alpha"
 group = project.maven_group
 
 repositories {
