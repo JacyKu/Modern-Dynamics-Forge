@@ -13,7 +13,7 @@ targetCompatibility = JavaVersion.VERSION_17
 archivesBaseName = project.archives_base_name
 version = System.getenv("MOD_VERSION")
         ? System.getenv("MOD_VERSION")
-        : "0.0.2-alpha"
+        : "1.0.0"
 group = project.maven_group
 
 repositories {
@@ -73,9 +73,9 @@ dependencies {
     compileOnly(fg.deobf("mezz.jei:jei-${project.jei_minecraft_version}-forge:${project.jei_version}")) {
         exclude group: "mezz.jei"
     }
-    runtimeOnly(fg.deobf("mezz.jei:jei-${project.jei_minecraft_version}-forge:${project.jei_version}")) {
-        exclude group: "mezz.jei"
-    }
+//    runtimeOnly(fg.deobf("mezz.jei:jei-${project.jei_minecraft_version}-forge:${project.jei_version}")) {
+//        exclude group: "mezz.jei"
+//    }
     compileOnly fg.deobf("me.shedaniel:RoughlyEnoughItems-forge:${project.rei_version}")
     // REI's Forge POM declares these transitive compile dependencies, but they are not exposed
     // reliably through fg.deobf for source compilation, so declare them explicitly.
