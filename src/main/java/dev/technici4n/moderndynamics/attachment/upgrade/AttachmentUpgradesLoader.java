@@ -100,6 +100,29 @@ public class AttachmentUpgradesLoader extends SimplePreparableReloadListener<Lis
         return new LoadedUpgrades(map, list);
     }
 
+    private static void cacheLoadedUpgrades(ResourceManager resourceManager, LoadedUpgrades upgrades) {
+        LOADED_UPGRADES.put(resourceManager, upgrades);
+
+        var server = ServerLifecycleHooks.getCurrentServer();
+        if (server != null && server.getResourceManager() == resourceManager) {
+            LoadedUpgrades.trySet(upgrades);
+        }
+    }
+
+    private static LoadedUpgrades getOrLoadUpgrades(ResourceManager resourceManager) {
+        var upgrades = LOADED_UPGRADES.get(resourceManager);
+        if (upgrades == null) {
+            upgrades = load(resourceManager);
+            LOADED_UPGRADES.put(resourceManager, upgrades);
+        }
+
+        return upgrades;
+    }
+
+    private static void ensureLoaded(ResourceManager resourceManager) {
+        LoadedUpgrades.trySet(getOrLoadUpgrades(resourceManager));
+    }
+
     @Override
     protected List<JsonObject> prepare(ResourceManager resourceManager, ProfilerFiller profiler) {
         return collectEntries(resourceManager);
@@ -107,18 +130,18 @@ public class AttachmentUpgradesLoader extends SimplePreparableReloadListener<Lis
 
     @Override
     protected void apply(List<JsonObject> array, ResourceManager resourceManager, ProfilerFiller profiler) {
-        LOADED_UPGRADES.put(resourceManager, parseEntries(array));
+        cacheLoadedUpgrades(resourceManager, parseEntries(array));
     }
 
     public static void setup() {
         MinecraftForge.EVENT_BUS.addListener((AddReloadListenerEvent event) -> event.addListener(new AttachmentUpgradesLoader()));
         MinecraftForge.EVENT_BUS.addListener((ServerAboutToStartEvent event) -> {
             var server = event.getServer();
-            LoadedUpgrades.trySet(LOADED_UPGRADES.remove(server.getResourceManager()));
+            ensureLoaded(server.getResourceManager());
         });
         MinecraftForge.EVENT_BUS.addListener((OnDatapackSyncEvent event) -> {
             var server = ServerLifecycleHooks.getCurrentServer();
-            LoadedUpgrades.trySet(LOADED_UPGRADES.remove(server.getResourceManager()));
+            ensureLoaded(server.getResourceManager());
 
             var player = event.getPlayer();
             if (player != null) {

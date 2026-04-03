@@ -35,6 +35,7 @@ import net.minecraftforge.network.NetworkEvent;
 import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.network.simple.SimpleChannel;
+import org.jetbrains.annotations.Nullable;
 
 public class MdProxy {
     private static final String PROTOCOL_VERSION = "1";
@@ -113,8 +114,15 @@ public class MdProxy {
                 return;
             }
 
-            Player player = context.getDirection().getReceptionSide().isServer() ? context.getSender() : INSTANCE.getClientPlayer();
-            if (player == null) {
+            @Nullable
+            Player player;
+            if (context.getDirection().getReceptionSide().isServer()) {
+                player = context.getSender();
+            } else {
+                player = INSTANCE.getClientPlayer();
+            }
+
+            if (context.getDirection().getReceptionSide().isServer() && player == null) {
                 return;
             }
 
@@ -125,7 +133,8 @@ public class MdProxy {
                     action.run();
                 }
             } catch (RuntimeException exception) {
-                ModernDynamics.LOGGER.error("Failed to handle packet {} for {}", packet.packetId, player.getGameProfile().getName(), exception);
+                var playerName = player == null ? "<no client player yet>" : player.getGameProfile().getName();
+                ModernDynamics.LOGGER.error("Failed to handle packet {} for {}", packet.packetId, playerName, exception);
             } finally {
                 buf.release();
             }

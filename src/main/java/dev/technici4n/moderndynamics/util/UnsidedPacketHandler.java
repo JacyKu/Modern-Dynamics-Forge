@@ -20,11 +20,12 @@ package dev.technici4n.moderndynamics.util;
 
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.entity.player.Player;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A packet handler that works both client-side and server-side.
  */
 @FunctionalInterface
 public interface UnsidedPacketHandler {
-    Runnable handlePacket(Player player, FriendlyByteBuf buf);
+    Runnable handlePacket(@Nullable Player player, FriendlyByteBuf buf);
 }
