@@ -22,7 +22,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class TickHelper {
-    private static long tickCounter = 0;
+    // Start above 0 so newly placed pipes with a last tick of 0 can operate immediately.
+    private static long tickCounter = 1000;
     private static List<Runnable> delayedActions = new ArrayList<>();
     private static List<Runnable> delayedActions2 = new ArrayList<>();
 

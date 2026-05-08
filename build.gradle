@@ -49,10 +49,23 @@ repositories {
         }
     }
     maven {
+        url 'https://maven.bai.lol'
+        content {
+            includeGroup 'lol.bai'
+            includeGroup 'mcp.mobius.waila'
+        }
+    }
+    maven {
         name 'modmaven'
         url "https://modmaven.dev/"
         content {
             includeGroup "mezz.jei"
+        }
+    }
+    maven {
+        url "https://www.cursemaven.com"
+        content {
+            includeGroup "curse.maven"
         }
     }
 }
@@ -84,6 +97,9 @@ dependencies {
 
     compileOnly fg.deobf("dev.emi:emi-forge:${project.emi_version}+${project.emi_minecraft_version}")
 //    runtimeOnly fg.deobf("dev.emi:emi-forge:${project.emi_version}+${project.emi_minecraft_version}")
+
+    implementation fg.deobf("curse.maven:jade-324717:5390389")
+    implementation fg.deobf("curse.maven:immersive-engineering-231951:6206989")
 
 }
 
@@ -152,6 +168,13 @@ minecraft {
 
         client {
             property 'forge.enabledGameTestNamespaces', 'moderndynamics'
+        }
+
+        client2 {
+            parent runs.client
+            client true
+            property 'forge.enabledGameTestNamespaces', 'moderndynamics'
+            args '--username', 'Dev2'
         }
 
         server {

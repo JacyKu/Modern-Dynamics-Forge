@@ -73,6 +73,7 @@ public abstract class NodeHost {
         if (attachment != null) {
             this.attachments[side.get3DDataValue()] = null;
             update();
+            pipe.invalidateCaps();
             return attachment;
         }
         return null;
@@ -87,6 +88,7 @@ public abstract class NodeHost {
         } else {
             attachments[side.get3DDataValue()] = item.createAttached(this, data);
             scheduleUpdate();
+            pipe.invalidateCaps();
         }
     }
 
@@ -144,16 +146,33 @@ public abstract class NodeHost {
     @Nullable
     public abstract Object getApiInstance(Capability<?> capability, @Nullable Direction side);
 
+    /**
+     * Returns null if the node is not available.
+     * Throws an exception if the host is not on the logical server.
+     */
+    @SuppressWarnings("unchecked")
+    // TODO: consider making this not nullable
+    @Nullable
+    protected final <H extends NodeHost, C extends NetworkCache<H, C>> NetworkNode<H, C> findNodeOnServer() {
+        return getManager().findNode((ServerLevel) pipe.getLevel(), pipe.getBlockPos());
+    }
+
+    /**
+     * Returns null on the client side or if the node is not available.
+     */
     @SuppressWarnings("unchecked")
     @Nullable
     protected final <H extends NodeHost, C extends NetworkCache<H, C>> NetworkNode<H, C> findNode() {
-        // TODO: not the best unchecked cast...
-        return getManager().findNode((ServerLevel) pipe.getLevel(), pipe.getBlockPos());
+        if (pipe.getLevel() instanceof ServerLevel serverLevel) {
+            return getManager().findNode(serverLevel, pipe.getBlockPos());
+        } else {
+            return null;
+        }
     }
 
     public final void separateNetwork() {
         @Nullable
-        NetworkNode<?, ?> node = findNode();
+        NetworkNode<?, ?> node = findNodeOnServer();
 
         if (node != null && node.getHost() == this) {
             node.getNetworkCache().separate();
@@ -178,7 +197,7 @@ public abstract class NodeHost {
         if (!needsUpdate) {
             needsUpdate = true;
             @Nullable
-            NetworkNode node = findNode();
+            NetworkNode node = findNodeOnServer();
 
             if (node != null) {
                 node.getNetworkCache().scheduleHostUpdate(this);

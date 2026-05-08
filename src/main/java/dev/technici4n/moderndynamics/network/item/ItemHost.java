@@ -34,6 +34,7 @@ import dev.technici4n.moderndynamics.pipe.PipeBlockEntity;
 import dev.technici4n.moderndynamics.util.DropHelper;
 import dev.technici4n.moderndynamics.util.ItemVariant;
 import dev.technici4n.moderndynamics.util.SerializationHelper;
+import io.netty.buffer.Unpooled;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -43,6 +44,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.common.capabilities.Capability;
@@ -114,6 +116,7 @@ public class ItemHost extends NodeHost {
                 double speedupFactor = getAttachment(side) instanceof ItemAttachedIo io ? io.getItemSpeedupFactor() : 1;
                 return cache.insertList(node, paths, resource, maxAmount, simulate, speedupFactor, null);
             } else {
+                // The node can be null on the client or if the pipe was just placed and not initialized yet.
                 return 0;
             }
         });
@@ -125,7 +128,7 @@ public class ItemHost extends NodeHost {
     private InsertionOnlyItemHandler buildExtractorNetworkInjectStorage(Direction side, ItemAttachedIo extractor,
             @Nullable MaxParticipant maxIndexParticipant) {
         double speedupFactor = extractor.getItemSpeedupFactor();
-        NetworkNode<ItemHost, ItemCache> node = findNode();
+        NetworkNode<ItemHost, ItemCache> node = findNodeOnServer();
         var cache = node.getNetworkCache();
         var paths = rearrangePaths(cache.pathCache.getPaths(node, side.getOpposite()), extractor);
         return new InsertionOnlyItemHandler((resource, maxAmount, simulate) -> {
@@ -233,7 +236,7 @@ public class ItemHost extends NodeHost {
             if (!insertTarget.hasStorage())
                 return;
 
-            NetworkNode<ItemHost, ItemCache> thisNode = findNode();
+            NetworkNode<ItemHost, ItemCache> thisNode = findNodeOnServer();
             var cache = thisNode.getNetworkCache();
             var pathCache = cache.pathCache;
             var paths = rearrangePaths(pathCache.getPaths(thisNode, side.getOpposite()), attractor);
@@ -306,11 +309,21 @@ public class ItemHost extends NodeHost {
             return;
         }
 
+        long curTick = getLevel().getGameTime();
+
         // List of items that moved out of this pipe.
         List<TravelingItem> movedOut = new ArrayList<>();
 
         for (var iterator = travelingItems.iterator(); iterator.hasNext();) {
             var travelingItem = iterator.next();
+
+            // Make sure we only update items once per tick.
+            // This makes sure that we don't update items twice if they get moved to another pipe.
+            if (travelingItem.lastTick == curTick) {
+                continue;
+            }
+            travelingItem.lastTick = curTick;
+
             // Calculate in which path segment the item is now, and in which segment it is after moving it
             int currentIndex = (int) travelingItem.traveledDistance;
             travelingItem.traveledDistance += travelingItem.getSpeed();
@@ -349,7 +362,7 @@ public class ItemHost extends NodeHost {
 
                 @Nullable
                 ItemHost adjacentItemHost = null;
-                NetworkNode<ItemHost, ItemCache> ownNode = findNode();
+                NetworkNode<ItemHost, ItemCache> ownNode = findNodeOnServer();
                 for (var connection : ownNode.getConnections()) {
                     if (connection.direction() == adjPipeDirection) {
                         adjacentItemHost = connection.target().getHost();
@@ -489,7 +502,7 @@ public class ItemHost extends NodeHost {
         // Update render
         if (oldConnections != inventoryConnections) {
             pipe.sync();
-            NetworkNode<ItemHost, ItemCache> node = findNode();
+            NetworkNode<ItemHost, ItemCache> node = findNodeOnServer();
             if (node != null) {
                 node.getNetworkCache().pathCache.invalidate();
             }
@@ -500,22 +513,19 @@ public class ItemHost extends NodeHost {
     public void writeClientNbt(CompoundTag tag) {
         super.writeClientNbt(tag);
 
-        if (travelingItems.size() > 0) {
-            ListTag list = new ListTag();
-            for (var travelingItem : travelingItems) {
-                CompoundTag compound = new CompoundTag();
-                compound.putInt("id", travelingItem.id);
-                compound.put("v", travelingItem.variant.toNbt());
-                compound.putInt("a", travelingItem.amount);
-                compound.putDouble("td", travelingItem.getPathLength() - 1);
-                compound.putDouble("d", travelingItem.traveledDistance);
-                int currentBlock = (int) Math.floor(travelingItem.traveledDistance);
-                compound.putByte("in", (byte) travelingItem.path.path[currentBlock].get3DDataValue());
-                compound.putByte("out", (byte) travelingItem.path.path[currentBlock + 1].get3DDataValue());
-                compound.putDouble("s", travelingItem.getSpeed());
-                list.add(compound);
+        if (!travelingItems.isEmpty()) {
+            var buf = new FriendlyByteBuf(Unpooled.buffer());
+            try {
+                buf.writeInt(travelingItems.size());
+                for (var travelingItem : travelingItems) {
+                    travelingItem.writeClient(buf);
+                }
+                byte[] bytes = new byte[buf.readableBytes()];
+                buf.readBytes(bytes);
+                tag.putByteArray("items", bytes);
+            } finally {
+                buf.release();
             }
-            tag.put("travelingItems", list);
         }
     }
 
@@ -524,28 +534,38 @@ public class ItemHost extends NodeHost {
         super.readClientNbt(tag);
 
         clientTravelingItems.clear();
-        ListTag list = tag.getList("travelingItems", Tag.TAG_COMPOUND);
-        for (int i = 0; i < list.size(); ++i) {
-            CompoundTag compound = list.getCompound(i);
-            var newItem = new ClientTravelingItem(
-                    compound.getInt("id"),
-                    ItemVariant.fromNbt(compound.getCompound("v")),
-                    compound.getInt("a"),
-                    compound.getDouble("td"),
-                    compound.getDouble("d"),
-                    Direction.from3DDataValue(compound.getByte("in")),
-                    Direction.from3DDataValue(compound.getByte("out")),
-                    compound.getDouble("s"));
-            clientTravelingItems.add(newItem);
-            ClientTravelingItemSmoothing.onReceiveItem(newItem);
+        byte[] bytes = tag.getByteArray("items");
+        if (bytes.length > 0) {
+            var buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(bytes));
+            try {
+                int count = buf.readInt();
+                for (int i = 0; i < count; i++) {
+                    var newItem = TravelingItem.readClient(buf);
+                    clientTravelingItems.add(newItem);
+                    ClientTravelingItemSmoothing.onReceiveItem(newItem);
+                }
+            } finally {
+                buf.release();
+            }
         }
     }
 
     @Override
     public void clientTick() {
+        long curTick = getLevel().getGameTime();
+
         for (var it = clientTravelingItems.iterator(); it.hasNext();) {
             ClientTravelingItem travelingItem = it.next();
+
+            // Make sure we only update items once per tick.
+            // This makes sure that we don't update items twice if they get moved to another pipe.
+            if (travelingItem.lastTick == curTick) {
+                continue;
+            }
+            travelingItem.lastTick = curTick;
+
             travelingItem.traveledDistance += travelingItem.speed();
+            ClientTravelingItemSmoothing.onTickItem(travelingItem);
 
             if (Mth.frac(travelingItem.traveledDistance) < travelingItem.speed()) {
                 // Goes out of this pipe!

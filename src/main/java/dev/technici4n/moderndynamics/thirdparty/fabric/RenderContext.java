@@ -16,13 +16,15 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
-package dev.technici4n.moderndynamics.init;
+package dev.technici4n.moderndynamics.thirdparty.fabric;
 
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.tags.TagKey;
-import net.minecraft.world.item.Item;
-
-public class MdTags {
-    public static final TagKey<Item> WRENCHES = TagKey.create(Registries.ITEM, new ResourceLocation("forge", "tools/wrench"));
+public interface RenderContext {
+    @FunctionalInterface
+    public interface QuadTransform {
+        /**
+         * Return false to filter out quads from rendering. When more than one transform is in effect, returning false
+         * means unapplied transforms will not receive the quad.
+         */
+        boolean transform(MutableQuadView quad);
+    }
 }

@@ -19,10 +19,13 @@
 package dev.technici4n.moderndynamics.network.item;
 
 import dev.technici4n.moderndynamics.Constants;
+import dev.technici4n.moderndynamics.network.item.sync.ClientTravelingItem;
 import dev.technici4n.moderndynamics.util.ItemVariant;
 import dev.technici4n.moderndynamics.util.SerializationHelper;
 import java.util.concurrent.atomic.AtomicInteger;
+import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.FriendlyByteBuf;
 
 public class TravelingItem {
     private static final AtomicInteger NEXT_ID = new AtomicInteger();
@@ -34,6 +37,7 @@ public class TravelingItem {
     public final FailedInsertStrategy strategy;
     public final double speedMultiplier;
     public double traveledDistance;
+    public long lastTick;
 
     public TravelingItem(ItemVariant variant, int amount, ItemPath path, FailedInsertStrategy strategy, double speedMultiplier,
             double traveledDistance) {
@@ -84,5 +88,29 @@ public class TravelingItem {
                 FailedInsertStrategy.bySerializedName(nbt.getString("strategy")),
                 nbt.getDouble("speedMultiplier"),
                 nbt.getDouble("d"));
+    }
+
+    void writeClient(FriendlyByteBuf buf) {
+        buf.writeInt(id);
+        variant.toPacket(buf);
+        buf.writeInt(amount);
+        buf.writeDouble(getPathLength() - 1);
+        buf.writeDouble(traveledDistance);
+        int currentBlock = (int) Math.floor(traveledDistance);
+        buf.writeEnum(path.path[currentBlock]);
+        buf.writeEnum(path.path[currentBlock + 1]);
+        buf.writeDouble(getSpeed());
+    }
+
+    static ClientTravelingItem readClient(FriendlyByteBuf buf) {
+        return new ClientTravelingItem(
+                buf.readInt(),
+                ItemVariant.fromPacket(buf),
+                buf.readInt(),
+                buf.readDouble(),
+                buf.readDouble(),
+                buf.readEnum(Direction.class),
+                buf.readEnum(Direction.class),
+                buf.readDouble());
     }
 }

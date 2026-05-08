@@ -39,6 +39,7 @@ import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -80,6 +81,16 @@ public abstract class PipeBlockEntity extends MdBlockEntity {
         return hosts;
     }
 
+    @Nullable
+    public final <T> T findHost(Class<T> hostClass) {
+        for (var host : getHosts()) {
+            if (hostClass.isInstance(host)) {
+                return hostClass.cast(host);
+            }
+        }
+        return null;
+    }
+
     private boolean hasAttachment(Direction side) {
         if (isClientSide()) {
             var pipeData = getPipeModelData();
@@ -104,6 +115,21 @@ public abstract class PipeBlockEntity extends MdBlockEntity {
             }
         }
         return null;
+    }
+
+    @Nullable
+    public Item getAttachmentItem(Direction side) {
+        if (isClientSide()) {
+            var pipeModelData = getPipeModelData();
+            if (pipeModelData != null) {
+                var attachment = pipeModelData.attachments()[side.get3DDataValue()];
+                return attachment == null ? null : attachment.item();
+            }
+            return null;
+        } else {
+            var attachment = getAttachment(side);
+            return attachment == null ? null : attachment.getItem();
+        }
     }
 
     @Override
@@ -344,6 +370,7 @@ public abstract class PipeBlockEntity extends MdBlockEntity {
         refreshHosts();
         // The call to getNode() causes a network rebuild, but that shouldn't be an issue. (?)
         scheduleHostUpdates();
+        invalidateCaps();
 
         level.blockUpdated(worldPosition, getBlockState().getBlock());
         setChanged();
@@ -370,23 +397,29 @@ public abstract class PipeBlockEntity extends MdBlockEntity {
                 if (ShapeHelper.shapeContains(PipeBoundingBoxes.INVENTORY_CONNECTIONS[i], posInBlock)) {
                     var side = Direction.from3DDataValue(i);
                     if (hasAttachment(side)) {
-                        // Remove attachment
+                        // We will either remove the attachment or clear out its stuffed items.
+                        // In any case, for the client it's a success.
                         if (level.isClientSide()) {
                             return InteractionResult.SUCCESS;
-                        } else {
-                            for (var host : getHosts()) {
-                                var attachment = host.removeAttachment(side);
-                                if (attachment != null) {
-                                    if (!player.isCreative()) {
-                                        DropHelper.dropStacks(this, attachment.getDrops());
-                                    }
-                                    level.blockUpdated(worldPosition, getBlockState().getBlock());
-                                    refreshHosts();
-                                    scheduleHostUpdates();
-                                    setChanged();
-                                    sync();
+                        }
+
+                        for (var host : getHosts()) {
+                            var attachment = host.getAttachment(side);
+                            if (attachment != null) {
+                                if (attachment.tryClearContents(this)) {
                                     return InteractionResult.CONSUME;
                                 }
+
+                                host.removeAttachment(side);
+                                if (!player.isCreative()) {
+                                    DropHelper.dropStacks(this, attachment.getDrops());
+                                }
+                                level.blockUpdated(worldPosition, getBlockState().getBlock());
+                                refreshHosts();
+                                scheduleHostUpdates();
+                                setChanged();
+                                sync();
+                                return InteractionResult.CONSUME;
                             }
                         }
                     } else {
@@ -428,7 +461,10 @@ public abstract class PipeBlockEntity extends MdBlockEntity {
                                     initialData = new CompoundTag();
                                 }
                                 host.setAttachment(hitSide, attachmentItem, initialData);
-                                host.getAttachment(hitSide).onPlaced(player);
+                                var placedAttachment = host.getAttachment(hitSide);
+                                if (placedAttachment != null) {
+                                    placedAttachment.onPlaced(player);
+                                }
                                 level.blockUpdated(worldPosition, getBlockState().getBlock());
                                 refreshHosts();
                                 scheduleHostUpdates();
@@ -467,6 +503,10 @@ public abstract class PipeBlockEntity extends MdBlockEntity {
         return InteractionResult.PASS;
     }
 
+    public Vec3 getPosInBlock(HitResult hitResult) {
+        return hitResult.getLocation().subtract(worldPosition.getX(), worldPosition.getY(), worldPosition.getZ());
+    }
+
     @Nullable
     public Direction hitTestAttachments(Vec3 posInBlock) {
         // Handle click on attachment
@@ -482,7 +522,7 @@ public abstract class PipeBlockEntity extends MdBlockEntity {
     }
 
     public ItemStack overridePickBlock(HitResult hitResult) {
-        Vec3 posInBlock = hitResult.getLocation().subtract(worldPosition.getX(), worldPosition.getY(), worldPosition.getZ());
+        Vec3 posInBlock = getPosInBlock(hitResult);
         Direction side = hitTestAttachments(posInBlock);
         if (side == null) {
             return ItemStack.EMPTY;
